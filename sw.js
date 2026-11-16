@@ -1,6 +1,6 @@
 /* Service worker — ເຮັດໃຫ້ແອັບເປີດໄດ້ເຖິງບໍ່ມີເນັດ */
-const CACHE = 'gomart-shift-1.5.2';
-const V = '1.5.2';   /* ຕ້ອງຕົງກັບ ?v= ໃນ index.html */
+const CACHE = 'gomart-shift-1.5.3';
+const V = '1.5.3';   /* ຕ້ອງຕົງກັບ ?v= ໃນ index.html */
 const ASSETS = [
   './index.html', './manifest.json',
   './img/logo-64.png', './img/logo-96.png', './img/logo-180.png',
@@ -30,7 +30,10 @@ self.addEventListener('fetch', e => {
    * ເນັດຫຼຸດຈຶ່ງຄ່ອຍໃຊ້ຂອງໃນແຄດ */
   if (e.request.mode === 'navigate' || e.request.destination === 'document') {
     e.respondWith(
-      fetch(e.request).then(res => {
+      /* cache:'reload' ຂ້າມແຄດຂອງບຣາວເຊີ ແລະ CDN
+       * GitHub Pages ບັງຄັບ max-age=600 ກັບ index.html ປ່ຽນບໍ່ໄດ້
+       * ຖ້າບໍ່ຂ້າມ ມືຖືຈະເຫັນລຸ່ນເກົ່າໄດ້ເຖິງ 10 ນາທີຫຼັງຂຶ້ນລຸ່ນໃໝ່ */
+      fetch(e.request.url, { cache: 'reload', credentials: 'same-origin' }).then(res => {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put('./index.html', copy)).catch(() => {});
         return res;
