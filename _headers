@@ -1,0 +1,30 @@
+# ກົດການແຄດ — ໃຊ້ໄດ້ທັງ Cloudflare Pages ແລະ Netlify
+#
+# index.html ຫ້າມແຄດ ບໍ່ດັ່ງນັ້ນມືຖືພະນັກງານຈະຍັງໂຫຼດ ?v= ເກົ່າ
+# ແລ້ວຈະບໍ່ເຫັນລຸ່ນໃໝ່ເລີຍ ເຖິງວ່າຈະຂຶ້ນເວັບແລ້ວ
+
+/
+  Cache-Control: no-cache
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: same-origin
+
+/index.html
+  Cache-Control: no-cache
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: same-origin
+
+/sw.js
+  Cache-Control: no-cache
+
+/manifest.json
+  Cache-Control: no-cache
+
+# ໄຟລ໌ທີ່ມີ ?v= ຢູ່ແລ້ວ ແຄດໄດ້ດົນ ເພາະປ່ຽນລຸ່ນແລ້ວ URL ປ່ຽນຕາມ
+/css/*
+  Cache-Control: public, max-age=31536000
+
+/js/*
+  Cache-Control: public, max-age=31536000
+
+/img/*
+  Cache-Control: public, max-age=31536000
