@@ -1,6 +1,6 @@
 /* Service worker — ເຮັດໃຫ້ແອັບເປີດໄດ້ເຖິງບໍ່ມີເນັດ */
-const CACHE = 'gomart-shift-1.5.1';
-const V = '1.5.1';   /* ຕ້ອງຕົງກັບ ?v= ໃນ index.html */
+const CACHE = 'gomart-shift-1.5.2';
+const V = '1.5.2';   /* ຕ້ອງຕົງກັບ ?v= ໃນ index.html */
 const ASSETS = [
   './index.html', './manifest.json',
   './img/logo-64.png', './img/logo-96.png', './img/logo-180.png',
@@ -24,11 +24,27 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+
+  /* ໜ້າເວັບ (index.html) — ເອົາຈາກເນັດກ່ອນສະເໝີ
+   * ບໍ່ດັ່ງນັ້ນຫຼັງຂຶ້ນລຸ່ນໃໝ່ ຈະຕ້ອງເປີດແອັບ 2 ຮອບຈຶ່ງເຫັນຂອງໃໝ່
+   * ເນັດຫຼຸດຈຶ່ງຄ່ອຍໃຊ້ຂອງໃນແຄດ */
+  if (e.request.mode === 'navigate' || e.request.destination === 'document') {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put('./index.html', copy)).catch(() => {});
+        return res;
+      }).catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
+
+  /* ໄຟລ໌ອື່ນມີ ?v= ຢູ່ແລ້ວ ປ່ຽນລຸ່ນແລ້ວ URL ປ່ຽນຕາມ — ເອົາຈາກແຄດກ່ອນໄດ້ */
   e.respondWith(
     caches.match(e.request).then(hit => hit || fetch(e.request).then(res => {
       const copy = res.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
       return res;
-    }).catch(() => caches.match('./index.html')))
+    }))
   );
 });
