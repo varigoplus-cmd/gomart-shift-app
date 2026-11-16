@@ -135,6 +135,7 @@ SCREENS.shiftDetail = async function (shiftId) {
 
   const line = (label, value, cls = '') => h('div', { class: 'vrow ' + cls },
     [h('span', { text: label }), h('b', { text: value })]);
+  /* ແຖວເຕືອນໃຊ້ສີແດງ */
 
   const body = [
     card([
@@ -162,6 +163,8 @@ SCREENS.shiftDetail = async function (shiftId) {
       line('ລາຍການກວດທີ່ບໍ່ຜ່ານ', String(failed.length)),
       line('ອຸນຫະພູມນອກເກນ', String(outOfRange.length)),
       line('ຮູບຖ່າຍ', photos.length + ' ໃບ'),
+      (() => { const n = photos.filter(x => x.source && x.source !== 'camera').length;
+               return n ? line('ຮູບທີ່ບໍ່ໄດ້ຜ່ານກ້ອງໃນແອັບ', String(n), 'bad-line') : null; })(),
       line('ບັນຫາທີ່ແຈ້ງ', String(issues.length)),
       line('ລາຍການສິນຄ້າ', String(stock.length))
     ]),

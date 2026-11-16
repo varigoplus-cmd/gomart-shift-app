@@ -706,34 +706,70 @@ SCREENS.photos = async function (phase) {
   /* ປຸ່ມຫຼັກມີໄດ້ 1 ປຸ່ມຕໍ່ຈໍ — ໃຫ້ເປັນຈຸດຕໍ່ໄປທີ່ຍັງບໍ່ໄດ້ຖ່າຍ */
   const nextKey = (pts.find(c => !byKey[c.key]) || {}).key;
 
+  /* ບັນທຶກຮູບ — ໃຊ້ທາງດຽວກັນທັງກ້ອງໃນແອັບ ແລະ ທາງສໍາຮອງ */
+  async function savePhoto(pt, source, src, existing) {
+    U.toast('ກໍາລັງບັນທຶກຮູບ...');
+    const pos = await U.geo();
+    const lines = [
+      `${sh.branch} · ${shiftDef(sh.shiftKey).label}`,
+      `${U.stamp()} · ${sh.staff}`,
+      pt.label + (pos ? ` · ${pos.lat},${pos.lng}` : '')
+    ];
+    const blob = await U.watermark(src, lines);
+    if (existing) await DB.del('photos', existing.id);
+    await DB.put('photos', {
+      shiftId: sh.id, phase, checkpoint: pt.key, label: pt.label,
+      blob, gps: pos, source,              /* camera = ກ້ອງໃນແອັບ · fallback = ທາງສໍາຮອງ */
+      ts: new Date().toISOString(), staff: sh.staff, branch: sh.branch
+    });
+    U.toast(source === 'camera' ? 'ບັນທຶກຮູບແລ້ວ' : 'ບັນທຶກແລ້ວ (ບໍ່ໄດ້ໃຊ້ກ້ອງໃນແອັບ)');
+    go('photos', phase);
+  }
+
   const cards = pts.map(pt => {
     const existing = byKey[pt.key];
     const thumb = h('div', { class: 'thumb' });
-    if (existing) thumb.appendChild(h('img', { src: URL.createObjectURL(existing.blob) }));
+    if (existing) {
+      thumb.appendChild(h('img', { src: URL.createObjectURL(existing.blob) }));
+      if (existing.source && existing.source !== 'camera') {
+        thumb.appendChild(h('div', { class: 'thumb-warn',
+          text: '⚠ ຮູບນີ້ບໍ່ໄດ້ຖ່າຍຜ່ານກ້ອງໃນແອັບ' }));
+      }
+    }
 
+    /* ທາງສໍາຮອງ — ໃຊ້ສະເພາະເມື່ອກ້ອງໃນແອັບເປີດບໍ່ໄດ້ */
     const file = h('input', {
       type: 'file', accept: 'image/*', capture: 'environment', style: 'display:none',
       onchange: async e => {
         const f = e.target.files[0]; if (!f) return;
-        U.toast('ກໍາລັງບັນທຶກຮູບ...');
-        const pos = await U.geo();
-        const lines = [
-          `${sh.branch} · ${shiftDef(sh.shiftKey).label}`,
-          `${U.stamp()} · ${sh.staff}`,
-          pt.label + (pos ? ` · ${pos.lat},${pos.lng}` : '')
-        ];
-        try {
-          const blob = await U.watermark(f, lines);
-          if (existing) await DB.del('photos', existing.id);
-          await DB.put('photos', {
-            shiftId: sh.id, phase, checkpoint: pt.key, label: pt.label,
-            blob, gps: pos, ts: new Date().toISOString(), staff: sh.staff, branch: sh.branch
-          });
-          U.toast('ບັນທຶກຮູບແລ້ວ');
-          go('photos', phase);
-        } catch (err) { U.toast('ບັນທຶກຮູບບໍ່ໄດ້: ' + err.message, 'err'); }
+        try { await savePhoto(pt, 'fallback', f, existing); }
+        catch (err) { U.toast('ບັນທຶກຮູບບໍ່ໄດ້: ' + err.message, 'err'); }
       }
     });
+
+    async function shoot() {
+      if (!U.cameraAvailable()) {
+        U.toast('ເຄື່ອງນີ້ໃຊ້ກ້ອງໃນແອັບບໍ່ໄດ້ — ໃຊ້ທາງສໍາຮອງ', 'err');
+        return file.click();
+      }
+      let blob;
+      try {
+        blob = await U.openCamera(pt.label);
+      } catch (err) {
+        /* ເປີດກ້ອງບໍ່ໄດ້ — ບອກສາເຫດ ແລ້ວໃຫ້ທາງສໍາຮອງ ບໍ່ໃຫ້ພະນັກງານຕິດຂັດ */
+        const ok = await confirmSheet({
+          title: 'ເປີດກ້ອງບໍ່ໄດ້',
+          lines: [U.cameraError(err),
+                  'ຈະໃຊ້ທາງສໍາຮອງແທນບໍ? ຮູບຈະຖືກໝາຍໄວ້ວ່າບໍ່ໄດ້ຖ່າຍຜ່ານກ້ອງໃນແອັບ'],
+          confirmLabel: 'ໃຊ້ທາງສໍາຮອງ'
+        });
+        if (ok) file.click();
+        return;
+      }
+      if (!blob) return;                    /* ຜູ້ໃຊ້ກົດຍົກເລີກ */
+      try { await savePhoto(pt, 'camera', blob, existing); }
+      catch (err) { U.toast('ບັນທຶກຮູບບໍ່ໄດ້: ' + err.message, 'err'); }
+    }
 
     return card([
       h('div', { class: 'pt-top' }, [
@@ -743,8 +779,8 @@ SCREENS.photos = async function (phase) {
       ]),
       thumb,
       file,
-      btn(existing ? 'ຖ່າຍໃໝ່' : 'ຖ່າຍຮູບ', () => file.click(),
-          pt.key === nextKey ? 'primary' : 'ghost')
+      btn(existing ? 'ຖ່າຍໃໝ່' : 'ຖ່າຍຮູບ', shoot,
+          pt.key === nextKey ? 'primary' : 'ghost', 'ກຳລັງເປີດກ້ອງ…')
     ]);
   });
 

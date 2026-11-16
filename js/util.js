@@ -152,6 +152,88 @@ const U = (() => {
     return Promise.resolve(window.confirm(msg));
   }
 
+  /* ---------- ກ້ອງໃນແອັບ ----------
+   * ເປີດກ້ອງຈິງດ້ວຍ getUserMedia — ເລືອກຮູບຈາກຄັງພາບບໍ່ໄດ້
+   * ຕ້ອງການ HTTPS. ຖ້າເປີດບໍ່ໄດ້ ຈະ throw ອອກມາໃຫ້ຜູ້ເອີ້ນຕັດສິນໃຈ
+   */
+  function cameraAvailable() {
+    return !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  }
+
+  function cameraError(e) {
+    const n = e && e.name;
+    if (n === 'NotAllowedError' || n === 'SecurityError')
+      return 'ບໍ່ໄດ້ຮັບອະນຸຍາດໃຊ້ກ້ອງ — ເປີດສິດກ້ອງໃຫ້ເວັບນີ້ໃນຕັ້ງຄ່າມືຖື';
+    if (n === 'NotFoundError' || n === 'OverconstrainedError')
+      return 'ບໍ່ພົບກ້ອງໃນເຄື່ອງນີ້';
+    if (n === 'NotReadableError')
+      return 'ກ້ອງຖືກແອັບອື່ນໃຊ້ຢູ່ — ປິດແອັບກ້ອງອື່ນແລ້ວລອງໃໝ່';
+    return 'ເປີດກ້ອງບໍ່ໄດ້: ' + (e && e.message ? e.message : 'ບໍ່ຮູ້ສາເຫດ');
+  }
+
+  /* ຄືນ Blob ຂອງຮູບ ຫຼື null ຖ້າຜູ້ໃຊ້ກົດຍົກເລີກ */
+  function openCamera(title) {
+    return new Promise(async (resolve, reject) => {
+      let stream = null, facing = 'environment', closed = false;
+
+      const video = el('video', { class: 'cam-video', autoplay: '', playsinline: '', muted: '' });
+      video.muted = true;
+      const shot = el('button', { class: 'cam-shot', 'aria-label': 'ຖ່າຍຮູບ' });
+      const flip = el('button', { class: 'cam-flip', text: '⟳', 'aria-label': 'ສະຫຼັບກ້ອງໜ້າ-ຫຼັງ' });
+      const cancel = el('button', { class: 'cam-x', text: '✕', 'aria-label': 'ຍົກເລີກ' });
+      const hint = el('div', { class: 'cam-hint', text: title || '' });
+      const wrap = el('div', { class: 'cam-wrap' }, [
+        video,
+        el('div', { class: 'cam-bar-top' }, [cancel, hint, flip]),
+        el('div', { class: 'cam-bar' }, [shot])
+      ]);
+
+      function stop() {
+        if (stream) stream.getTracks().forEach(t => t.stop());
+        stream = null;
+      }
+      function close(v) {
+        if (closed) return;
+        closed = true;
+        stop();
+        document.removeEventListener('keydown', onKey);
+        wrap.remove();
+        resolve(v);
+      }
+      const onKey = e => { if (e.key === 'Escape') close(null); };
+
+      async function start() {
+        stop();
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1440 } },
+          audio: false
+        });
+        video.srcObject = stream;
+        await video.play().catch(() => {});
+      }
+
+      cancel.addEventListener('click', () => close(null));
+      flip.addEventListener('click', async () => {
+        facing = facing === 'environment' ? 'user' : 'environment';
+        try { await start(); } catch (e) { toast(cameraError(e), 'err'); }
+      });
+      shot.addEventListener('click', () => {
+        if (!video.videoWidth) return toast('ກ້ອງຍັງບໍ່ພ້ອມ ລໍຖ້າຈັກໜ້ອຍ', 'err');
+        const c = document.createElement('canvas');
+        c.width = video.videoWidth; c.height = video.videoHeight;
+        c.getContext('2d').drawImage(video, 0, 0);
+        shot.disabled = true;
+        c.toBlob(b => b ? close(b) : (shot.disabled = false, toast('ບັນທຶກຮູບບໍ່ໄດ້', 'err')),
+                 'image/jpeg', 0.92);
+      });
+
+      document.body.appendChild(wrap);
+      document.addEventListener('keydown', onKey);
+      try { await start(); }
+      catch (e) { closed = true; wrap.remove(); document.removeEventListener('keydown', onKey); reject(e); }
+    });
+  }
+
   /* ---------- ໂໝດສະແດງຜົນ (ຈໍາຕໍ່ເຄື່ອງ) ---------- */
   const THEME_KEY = 'gomart_theme';
   function theme(v) {
@@ -178,5 +260,5 @@ const U = (() => {
 
   return { pad, today, nowTime, stamp, minutesLate, num, kip, watermark, geo,
            csv, download, downloadCsv, el, toast, toastUndo, confirmBox,
-           theme, applyTheme };
+           theme, applyTheme, cameraAvailable, openCamera, cameraError };
 })();
