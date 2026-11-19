@@ -302,13 +302,16 @@ SCREENS.report = async function (branchFilter) {
 
 async function exportShifts() {
   const [shifts, cash] = await Promise.all([DB.all('shifts'), DB.all('cash')]);
-  const rows = [['ວັນທີ', 'ສາຂາ', 'ກະ', 'ພະນັກງານ', 'ເປີດເວລາ', 'ຊ້າ(ນາທີ)', 'ປິດເວລາ', 'ສະຖານະ',
+  const rows = [['ວັນທີ', 'ສາຂາ', 'ກະ', 'ພະນັກງານ', 'ປະເພດ',
+                 'ເຊັກອິນ', 'ຊ້າ(ນາທີ)', 'ເຊັກເອົາ', 'ອອກກ່ອນ(ນາທີ)', 'ສະຖານະ',
                  'ເງິນທອນຕັ້ງຕົ້ນ', 'ຍອດເງິນສົດPOS', 'ເງິນສົດນັບໄດ້', 'ຄວນມີ', 'ສ່ວນຕ່າງ',
                  'ຍອດລວມPOS', 'QR/ໂອນ', 'ອື່ນໆ', 'ຈໍານວນບິນ', 'ບິນຍົກເລີກ', 'ສາເຫດສ່ວນຕ່າງ', 'ຜູ້ຈັດການ']];
   shifts.forEach(s => {
     const c = cash.find(x => x.shiftId === s.id) || {};
-    rows.push([s.date, s.branch, shiftDef(s.shiftKey).label, s.staff, U.stamp(s.openedAt), s.lateBy || 0,
-               s.closedAt ? U.stamp(s.closedAt) : '', s.status, s.float ?? '',
+    rows.push([s.date, s.branch, shiftDef(s.shiftKey).label, s.staff,
+               s.staffType === 'weekend' ? 'ພາດທາມ' : 'ປະຈໍາ',
+               U.stamp(s.openedAt), s.lateBy || 0,
+               s.closedAt ? U.stamp(s.closedAt) : '', s.earlyBy || 0, s.status, s.float ?? '',
                c.posCash ?? '', c.counted ?? '', c.expected ?? '', c.variance ?? '',
                c.posTotal ?? '', c.posQr ?? '', c.posOther ?? '', c.bills ?? '', c.voided ?? '',
                [c.reason, c.reasonNote].filter(Boolean).join(' - '), c.manager ?? '']);
@@ -525,7 +528,7 @@ async function exportBonus() {
       return l ? l.count : 0;
     })
   ]);
-  U.downloadCsv('gomart_bonus_' + ym + '.csv', [head, ...body]);
+  U.downloadCsv([head, ...body], 'gomart_bonus_' + ym + '.csv');
 }
 
 /* ---------- ຕັ້ງຄ່າ ---------- */
