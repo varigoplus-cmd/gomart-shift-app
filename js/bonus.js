@@ -8,8 +8,36 @@
  */
 const BONUS = (() => {
 
-  const monthOf = iso => (iso || '').slice(0, 7);
-  const thisMonth = () => U.today().slice(0, 7);
+  /* ຮອບເບີ້ຍບໍ່ແມ່ນເດືອນປະຕິທິນ — ຕັດຍອດວັນທີ 25
+   * ຮອບ '2026-11' ໝາຍເຖິງ 2026-10-26 ຮອດ 2026-11-25
+   * ວັນຕັດຍອດປ່ຽນໄດ້ໃນໜ້າຕັ້ງຄ່າ (bonusCutDay) */
+  const cutDay = () => (S.settings && S.settings.bonusCutDay) || 25;
+
+  function cycleIdOf(date) {
+    if (!date) return '';
+    const parts = String(date).slice(0, 10).split('-').map(Number);
+    let [y, m] = parts; const day = parts[2];
+    if (day > cutDay()) { m += 1; if (m > 12) { m = 1; y += 1; } }
+    return y + '-' + String(m).padStart(2, '0');
+  }
+
+  /* ວັນເລີ່ມ ແລະ ວັນສຸດທ້າຍຂອງຮອບ ເປັນ 'YYYY-MM-DD' */
+  function cycleRange(id) {
+    const [y, m] = String(id).split('-').map(Number);
+    const iso = d => d.toISOString().slice(0, 10);
+    return {
+      from: iso(new Date(Date.UTC(y, m - 2, cutDay() + 1))),
+      to:   iso(new Date(Date.UTC(y, m - 1, cutDay())))
+    };
+  }
+
+  const thisCycle = () => cycleIdOf(U.today());
+
+  /* ເຫຼືອອີກຈັກມື້ຈຶ່ງຕັດຍອດ */
+  function daysLeft(id) {
+    const { to } = cycleRange(id);
+    return Math.max(0, Math.round((new Date(to + 'T23:59:59') - new Date()) / 86400000));
+  }
 
   function ruleOf(key) { return CONFIG.bonusRules.find(r => r.key === key); }
 
@@ -49,17 +77,20 @@ const BONUS = (() => {
    * ຄືນຄ່າ: [{ staff, full, deducted, paid, pct, lines:[{rule, count, amount, total, refs}] }]
    * refs = ລາຍການອ້າງອີງ {shiftId, date, text} ເພື່ອໃຫ້ກົດເຂົ້າໄປເບິ່ງກະຕົ້ນທາງໄດ້
    */
-  async function month(ym, branch) {
-    ym = ym || thisMonth();
+  async function cycle(id, branch) {
+    id = id || thisCycle();
+    const span = cycleRange(id);
     const [shifts, cash, temps, checks, photos, issues, adjs] = await Promise.all([
       DB.all('shifts'), DB.all('cash'), DB.all('temps'),
       DB.all('checks'), DB.all('photos'), DB.all('issues'), DB.all('bonusAdj')
     ]);
 
-    const inMonth = shifts.filter(s =>
-      s.status !== 'cancelled' &&
-      monthOf(s.date || s.openedAt) === ym &&
-      (!branch || s.branch === branch));
+    const inMonth = shifts.filter(s => {
+      const d = String(s.date || s.openedAt || '').slice(0, 10);
+      return s.status !== 'cancelled' &&
+             d >= span.from && d <= span.to &&
+             (!branch || s.branch === branch);
+    });
 
     const byId = new Map(inMonth.map(s => [s.id, s]));
     const mine = id => byId.get(id);
@@ -106,13 +137,14 @@ const BONUS = (() => {
       if (i.status === 'ແກ້ແລ້ວ') return;
       if (!i.due || i.due >= today) return;
       if (branch && i.branch !== branch) return;
-      if (monthOf(i.date || i.ts) !== ym) return;
+      const idt = String(i.date || i.ts || '').slice(0, 10);
+      if (idt < span.from || idt > span.to) return;
       events.push({ name: i.owner, key: 'issueDue', text: i.text,
                     shiftId: i.shiftId || null, date: i.date || '' });
     });
 
     /* ການຫັກທີ່ຜູ້ຈັດການບັນທຶກເອງ (ເຊັ່ນ ບໍ່ມາເຮັດວຽກ) */
-    adjs.filter(a => a.month === ym && (!branch || !a.branch || a.branch === branch))
+    adjs.filter(a => a.month === id && (!branch || !a.branch || a.branch === branch))
         .forEach(a => events.push({
           name: a.staffName, key: a.ruleKey, text: a.note || '', date: a.date || '',
           shiftId: null, manual: true, amountOverride: a.amount
@@ -154,13 +186,19 @@ const BONUS = (() => {
     return rows;
   }
 
-  /* ເດືອນທີ່ມີຂໍ້ມູນຈິງ ໃໝ່ສຸດຢູ່ໜ້າ */
-  async function monthsAvailable() {
+  /* ຮອບທີ່ມີຂໍ້ມູນຈິງ ໃໝ່ສຸດຢູ່ໜ້າ */
+  async function cyclesAvailable() {
     const shifts = await DB.all('shifts');
     const set = new Set(shifts.filter(s => s.status !== 'cancelled')
-                              .map(s => monthOf(s.date || s.openedAt)));
-    set.add(thisMonth());
+                              .map(s => cycleIdOf(s.date || s.openedAt)));
+    set.add(thisCycle());
     return [...set].filter(Boolean).sort().reverse();
+  }
+
+  /* ແຖວຂອງຄົນດຽວໃນຮອບປັດຈຸບັນ — ໃຊ້ກັບການ໌ດເທິງສຸດຂອງໜ້າຫຼັກ */
+  async function forStaff(name, id) {
+    const rows = await cycle(id || thisCycle());
+    return rows.find(r => r.name === name) || null;
   }
 
   /* ໃຜກໍາລັງຢູ່ໃນຮ້ານຕອນນີ້ — ກະທີ່ເຊັກອິນແລ້ວແຕ່ຍັງບໍ່ເຊັກເອົາ */
@@ -170,5 +208,6 @@ const BONUS = (() => {
                  .sort((a, b) => (a.openedAt || '').localeCompare(b.openedAt || ''));
   }
 
-  return { month, monthsAvailable, onDuty, roster, staffByName, amountOf, fullFor, thisMonth, monthOf };
+  return { cycle, cyclesAvailable, forStaff, onDuty, roster, staffByName,
+           amountOf, fullFor, thisCycle, cycleIdOf, cycleRange, daysLeft, cutDay };
 })();

@@ -28,6 +28,7 @@ async function loadSettings() {
     lateMinutes: await DB.setting('lateMinutes') ?? d.lateMinutes,
     earlyMinutes: await DB.setting('earlyMinutes') ?? d.earlyMinutes,
     zonesPerShift: await DB.setting('zonesPerShift') ?? d.zonesPerShift,
+    bonusCutDay: await DB.setting('bonusCutDay') ?? d.bonusCutDay,
     bonusFull: await DB.setting('bonusFull') ?? d.bonusFull,
     bonusFullWeekend: await DB.setting('bonusFullWeekend') ?? d.bonusFullWeekend,
     bonusAmounts: await DB.setting('bonusAmounts') || {}
@@ -293,18 +294,24 @@ function statusPill(done, labelDone, labelTodo) {
 }
 
 function taskRow(label, done, onclick, extra, opt = {}) {
+  /* opt.icon = ແຜ່ນໄອຄອນເບື້ອງຊ້າຍ ແລະ ປ້າຍສະຖານະເບື້ອງຂວາ ແທນວົງກົມ */
+  const lead = opt.icon
+    ? h('span', { class: 'task-tile' + (done ? ' on' : '') + (opt.alert ? ' bad' : ''), text: opt.icon })
+    : h('span', { class: 'task-ck', text: done ? '✓' : '○' });
+  const body = h('span', { class: 'task-l' },
+    [h('span', { text: label }), extra ? h('small', { text: extra }) : null]);
+
   if (opt.disabled) {
-    return h('div', { class: 'task off', 'data-ui': 'content' }, [
-      h('span', { class: 'task-ck', text: '○' }),
-      h('span', { class: 'task-l' }, [h('span', { text: label }), extra ? h('small', { text: extra }) : null])
-    ]);
+    return h('div', { class: 'task off', 'data-ui': 'content' }, [lead, body]);
   }
   /* ແຖວງານແມ່ນເນື້ອຫາຂອງໜ້າ ບໍ່ແມ່ນແຖບເຄື່ອງມື */
   return h('button', { class: 'task' + (done ? ' done' : '') + (opt.alert ? ' alert' : ''),
                        'data-ui': 'content', onclick }, [
-    h('span', { class: 'task-ck', text: done ? '✓' : '○' }),
-    h('span', { class: 'task-l' }, [h('span', { text: label }), extra ? h('small', { text: extra }) : null]),
-    h('span', { class: 'task-go', text: '›' })
+    lead, body,
+    opt.icon
+      ? h('span', { class: 'pill ' + (opt.alert ? 'bad' : done ? 'ok' : 'todo'),
+                    text: opt.alert ? 'ກວດເບິ່ງ' : done ? 'ແລ້ວ' : 'ຍັງ' })
+      : h('span', { class: 'task-go', text: '›' })
   ]);
 }
 
@@ -323,28 +330,28 @@ SCREENS.home = async function () {
 
   /* ງານບັງຄັບທັງໝົດ ເກັບໄວ້ບ່ອນດຽວ ໃຊ້ທັງນັບຄວາມຄືບໜ້າ ແລະ ວາດແຖວ */
   const TASKS = [
-    { phase: 'ເປີດກະ', label: 'Checklist ໜ້າຮ້ານ', hint: 'ກວດຄວາມພ້ອມ 19 ລາຍການ',
+    { icon: '☑', phase: 'ເປີດກະ', label: 'Checklist ໜ້າຮ້ານ', hint: 'ກວດຄວາມພ້ອມ 19 ລາຍການ',
       done: p.checklist, go: () => go('checklist'),
       extra: p.checklist ? 'ບັນທຶກ ' + p.savedAt.checklist : '' },
-    { phase: 'ເປີດກະ', label: 'ກວດເຄື່ອງໃຊ້ ຮອບ 1', hint: 'ອ່ານອຸນຫະພູມຈາກໜ້າຈໍເຄື່ອງ',
+    { icon: '°C', phase: 'ເປີດກະ', label: 'ກວດເຄື່ອງໃຊ້ ຮອບ 1', hint: 'ອ່ານອຸນຫະພູມຈາກໜ້າຈໍເຄື່ອງ',
       done: p.temps1, go: () => go('equipment', 1),
       extra: p.temps1 ? 'ບັນທຶກ ' + p.savedAt.temps1 : '' },
-    { phase: 'ເປີດກະ', label: 'ຮູບເປີດກະ', hint: 'ຖ່າຍ ' + p.counts.openNeed + ' ຈຸດ',
+    { icon: '◉', phase: 'ເປີດກະ', label: 'ຮູບເປີດກະ', hint: 'ຖ່າຍ ' + p.counts.openNeed + ' ຈຸດ',
       done: p.photosOpen, go: () => go('photos', 'open'),
       extra: `${p.counts.openPhotos}/${p.counts.openNeed} ຈຸດ` },
-    { phase: 'ເປີດກະ', label: 'ເງິນທອນຕັ້ງຕົ້ນ', hint: 'ນັບເງິນທີ່ຮັບມາຕອນເລີ່ມກະ',
+    { icon: '₭', phase: 'ເປີດກະ', label: 'ເງິນທອນຕັ້ງຕົ້ນ', hint: 'ນັບເງິນທີ່ຮັບມາຕອນເລີ່ມກະ',
       done: p.float, go: () => go('float'),
       extra: p.float ? U.kip(sh.float) + ' ກີບ' : '' },
-    { phase: 'ລະຫວ່າງກະ', label: 'ກວດນັບໂຊນສິນຄ້າ', hint: 'ກວດ ' + p.zonesNeeded + ' ໂຊນຕໍ່ກະ',
+    { icon: '▤', phase: 'ລະຫວ່າງກະ', label: 'ກວດນັບໂຊນສິນຄ້າ', hint: 'ກວດ ' + p.zonesNeeded + ' ໂຊນຕໍ່ກະ',
       done: p.zones >= p.zonesNeeded, go: () => go('zone'),
       extra: `${p.zones}/${p.zonesNeeded} ໂຊນ` },
-    { phase: 'ປິດກະ', label: 'ກວດເຄື່ອງໃຊ້ ຮອບ 2', hint: 'ກ່ອນປິດຮ້ານ',
+    { icon: '°C', phase: 'ປິດກະ', label: 'ກວດເຄື່ອງໃຊ້ ຮອບ 2', hint: 'ກ່ອນປິດຮ້ານ',
       done: p.temps2, go: () => go('equipment', 2),
       extra: p.temps2 ? 'ບັນທຶກ ' + p.savedAt.temps2 : '' },
-    { phase: 'ປິດກະ', label: 'ຮູບປິດກະ', hint: 'ຖ່າຍ ' + p.counts.closeNeed + ' ຈຸດ ລວມ Z-Report',
+    { icon: '◉', phase: 'ປິດກະ', label: 'ຮູບປິດກະ', hint: 'ຖ່າຍ ' + p.counts.closeNeed + ' ຈຸດ ລວມ Z-Report',
       done: p.photosClose, go: () => go('photos', 'close'),
       extra: `${p.counts.closePhotos}/${p.counts.closeNeed} ຈຸດ` },
-    { phase: 'ປິດກະ', label: 'ນັບເງິນ + ທຽບ POS', hint: 'ນັບໃບເງິນ ແລະ ອ່ານຍອດຈາກ POS',
+    { icon: '₭', phase: 'ປິດກະ', label: 'ນັບເງິນ + ທຽບ POS', hint: 'ນັບໃບເງິນ ແລະ ອ່ານຍອດຈາກ POS',
       done: !!p.cash, go: () => go('cash'), alert: cashBad,
       extra: p.cash
         ? `ນັບໄດ້ ${U.kip(p.cash.counted)} · ສ່ວນຕ່າງ ${U.kip(p.cash.variance)} ກີບ · ບັນທຶກ ${p.savedAt.cash}`
@@ -372,9 +379,39 @@ SCREENS.home = async function () {
 
   const phaseCard = ph => card(
     TASKS.filter(t => t.phase === ph).map(t =>
-      taskRow(t.label, t.done, t.go, t.extra, { alert: t.alert })), 'tasks');
+      taskRow(t.label, t.done, t.go, t.extra, { alert: t.alert, icon: t.icon })), 'tasks');
+
+  /* ການ໌ດເທິງສຸດ: ເບີ້ຍຂະຫຍັນຂອງຕົນເອງ — ເຫັນທຸກມື້ວ່າເຫຼືອເທົ່າໃດ ແລະ ຍັງອີກຈັກມື້ຕັດຍອດ */
+  const cyc = BONUS.thisCycle();
+  const b = await BONUS.forStaff(sh.staff, cyc) ||
+            { paid: 0, deducted: 0, shiftCount: 0, full: 0, pct: 0 };
+  const span = BONUS.cycleRange(cyc);
+  const hchip = (label, value) => h('div', { class: 'hchip' }, [
+    h('div', { class: 'hchip-v', text: value }),
+    h('div', { class: 'hchip-l', text: label })
+  ]);
+  const hero = h('section', { class: 'hero' + (b.pct < 70 ? ' low' : '') }, [
+    h('div', { class: 'hero-top' }, [
+      h('div', { class: 'hero-main' }, [
+        h('div', { class: 'hero-l', text: 'ເບີ້ຍຂະຫຍັນຂອງທ່ານ' }),
+        h('div', { class: 'hero-v', text: U.kip(b.paid) + ' ກີບ' }),
+        h('div', { class: 'hero-s',
+          text: `ຈາກເຕັມ ${U.kip(b.full)} · ຕັດຍອດ ${span.to} ເຫຼືອ ${BONUS.daysLeft(cyc)} ມື້` })
+      ]),
+      h('button', { class: 'hero-ico', 'data-ui': 'skip',
+                    'aria-label': 'ເບິ່ງລາຍລະອຽດເບີ້ຍຂະຫຍັນ',
+                    onclick: () => go('bonusStaff', cyc + '|' + sh.staff) }, '›')
+    ]),
+    h('div', { class: 'hero-chips' }, [
+      hchip('ກະໃນຮອບນີ້', String(b.shiftCount)),
+      hchip('ຫັກໄປແລ້ວ', b.deducted ? U.kip(b.deducted) : '—'),
+      hchip('ງານມື້ນີ້', doneN + '/' + TASKS.length)
+    ])
+  ]);
 
   const body = [
+    hero,
+
     sh.lateBy > 0
       ? card([h('div', { class: 'warn',
           text: `⚠ ເປີດກະຊ້າ ${sh.lateBy} ນາທີ (ກະເລີ່ມ ${def.start})` })])
@@ -388,8 +425,8 @@ SCREENS.home = async function () {
     h('h3', { class: 'sec', text: 'ລະຫວ່າງກະ' }),
     card([
       ...TASKS.filter(t => t.phase === 'ລະຫວ່າງກະ')
-        .map(t => taskRow(t.label, t.done, t.go, t.extra)),
-      taskRow('ແຈ້ງບັນຫາ', false, () => go('issueNew'), 'ເມື່ອພົບສິ່ງຜິດປົກກະຕິ')
+        .map(t => taskRow(t.label, t.done, t.go, t.extra, { icon: t.icon })),
+      taskRow('ແຈ້ງບັນຫາ', false, () => go('issueNew'), 'ເມື່ອພົບສິ່ງຜິດປົກກະຕິ', { icon: '!' })
     ], 'tasks'),
 
     h('h3', { class: 'sec', text: 'ປິດກະ' }),

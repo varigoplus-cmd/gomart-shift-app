@@ -355,15 +355,15 @@ async function exportPhotos() {
 
 /* ແຖບເລືອກເດືອນ — ໃຊ້ຮ່ວມກັນທັງສອງໜ້າ */
 async function monthChips(current, onPick) {
-  const months = (await BONUS.monthsAvailable()).slice(0, 6);
+  const months = (await BONUS.cyclesAvailable()).slice(0, 6);
   return h('div', { class: 'chips' }, months.map(m =>
     h('button', { class: 'chip' + (m === current ? ' on' : ''), 'data-ui': 'chip',
                   onclick: () => onPick(m) }, m)));
 }
 
 SCREENS.bonus = async function (ym) {
-  ym = ym || BONUS.thisMonth();
-  const rows = await BONUS.month(ym);
+  ym = ym || BONUS.thisCycle();
+  const rows = await BONUS.cycle(ym);
   const chips = await monthChips(ym, m => go('bonus', m));
 
   const totalFull = rows.reduce((a, r) => a + r.full, 0);
@@ -390,7 +390,8 @@ SCREENS.bonus = async function (ym) {
                 text: U.kip(r.paid) })
   ]));
 
-  render('ເບີ້ຍຂະຫຍັນ', ym + ' · ' + rows.length + ' ຄົນ', [
+  const span = BONUS.cycleRange(ym);
+  render('ເບີ້ຍຂະຫຍັນ', span.from + ' ຫາ ' + span.to + ' · ' + rows.length + ' ຄົນ', [
     chips,
     h('div', { class: 'stats', 'data-ui': 'content' }, [
       stat('ຈ່າຍຈິງ (ກີບ)', U.kip(totalPaid), 'ເຕັມ ' + U.kip(totalFull)),
@@ -403,6 +404,8 @@ SCREENS.bonus = async function (ym) {
                         btn('ໄປໜ້າຫຼັກ', () => go('home'), 'ghost')]),
     card([
       h('div', { class: 'muted',
+        text: 'ຕັດຍອດທຸກວັນທີ ' + BONUS.cutDay() + ' ຮອບນີ້ເຫຼືອອີກ ' + BONUS.daysLeft(ym) + ' ມື້' }),
+      h('div', { class: 'muted',
         text: 'ກົດຊື່ເພື່ອເບິ່ງວ່າຖືກຫັກຍ້ອນຫຍັງແດ່ ແລະ ບັນທຶກການຫັກເພີ່ມເຊັ່ນ ບໍ່ມາເຮັດວຽກ' })
     ])
   ]);
@@ -411,7 +414,7 @@ SCREENS.bonus = async function (ym) {
 SCREENS.bonusStaff = async function (arg) {
   const [ym, name] = String(arg || '').split('|');
   if (!name) return go('bonus');
-  const rows = await BONUS.month(ym);
+  const rows = await BONUS.cycle(ym);
   const r = rows.find(x => x.name === name);
   if (!r) return go('bonus', ym);
 
@@ -487,7 +490,8 @@ SCREENS.bonusStaff = async function (arg) {
     ]))
   ], 'tasks') : null;
 
-  render(name, ym + ' · ' + r.shiftCount + ' ກະ', [
+  const span2 = BONUS.cycleRange(ym);
+  render(name, span2.from + ' ຫາ ' + span2.to + ' · ' + r.shiftCount + ' ກະ', [
     card([
       h('div', { class: 'vrow' }, [h('span', { text: 'ເບີ້ຍເຕັມ' }), h('b', { text: U.kip(r.full) + ' ກີບ' })]),
       h('div', { class: 'vrow bad-line' }, [h('span', { text: 'ຫັກທັງໝົດ' }), h('b', { text: '-' + U.kip(r.deducted) })]),
@@ -509,8 +513,8 @@ SCREENS.bonusStaff = async function (arg) {
 };
 
 async function exportBonus() {
-  const ym = BONUS.thisMonth();
-  const rows = await BONUS.month(ym);
+  const ym = BONUS.thisCycle();
+  const rows = await BONUS.cycle(ym);
   const head = ['ເດືອນ', 'ພະນັກງານ', 'ປະເພດ', 'ຈໍານວນກະ', 'ເບີ້ຍເຕັມ', 'ຫັກ', 'ໄດ້ຈິງ', '%',
                 ...CONFIG.bonusRules.map(r => r.label)];
   const body = rows.map(r => [
@@ -604,6 +608,9 @@ SCREENS.config = async function () {
     rowLabel('ເບີ້ຍເຕັມ ພາດທາມ (ກີບ/ເດືອນ)',
       input({ type: 'number', value: st.bonusFullWeekend,
               onchange: e => saveSetting('bonusFullWeekend', U.num(e.target.value)) })),
+    rowLabel('ຕັດຍອດເບີ້ຍທຸກວັນທີ',
+      input({ type: 'number', min: 1, max: 28, value: st.bonusCutDay,
+              onchange: e => saveSetting('bonusCutDay', U.num(e.target.value)) })),
     rowLabel('ອອກວຽກກ່ອນເວລາເກີນ (ນາທີ) = ຖືວ່າອອກກ່ອນ',
       input({ type: 'number', value: st.earlyMinutes,
               onchange: e => saveSetting('earlyMinutes', U.num(e.target.value)) })),

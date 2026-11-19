@@ -9,6 +9,7 @@
   --on-brand:#ffffff;          /* ຕົວອັກສອນເທິງປຸ່ມສີແບຣນ */
   --brand-text:#00675c;        /* ສີແບຣນເມື່ອໃຊ້ເປັນຕົວອັກສອນເທິງພື້ນຂາວ */
   --hdr-from:#008273; --hdr-to:#00675c;
+  --on-hdr:#ffffff;            /* ຕົວອັກສອນເທິງແຖບຫົວ ແລະ ການ໌ດເບີ້ຍ — ຂຽວເຂັ້ມທັງສອງໂໝດ */
   --yellow:#FCCF0B;
 
   /* ---- ພື້ນຜິວ (ໂໝດສະຫວ່າງ) ---- */
@@ -51,7 +52,7 @@
     --ink:#eaf3f0; --ink-2:#b8c8c3; --muted:#8a9a95;
     --brand:#2ec4a9; --brand-d:#23a892; --brand-l:#5fdcc2;
     --on-brand:#06211c; --brand-text:#5fdcc2;
-    --hdr-from:#0a7064; --hdr-to:#064f46;
+    --hdr-from:#0a7064; --hdr-to:#064f46; --on-hdr:#ffffff;
     --ok:#4fd1b2;   --ok-bg:#12332d;
     --warn:#f0b43c; --warn-bg:#33280f;
     --bad:#ff7a6e;  --bad-bg:#3a1e1b; --bad-ink:#2a0f0d;
@@ -66,7 +67,7 @@
   --ink:#eaf3f0; --ink-2:#b8c8c3; --muted:#8a9a95;
   --brand:#2ec4a9; --brand-d:#23a892; --brand-l:#5fdcc2;
   --on-brand:#06211c; --brand-text:#5fdcc2;
-  --hdr-from:#0a7064; --hdr-to:#064f46;
+  --hdr-from:#0a7064; --hdr-to:#064f46; --on-hdr:#ffffff;
   --ok:#4fd1b2;   --ok-bg:#12332d;
   --warn:#f0b43c; --warn-bg:#33280f;
   --bad:#ff7a6e;  --bad-bg:#3a1e1b; --bad-ink:#2a0f0d;
@@ -98,7 +99,7 @@ button{font:inherit;color:inherit}
    =========================================================== */
 .hdr{
   background:linear-gradient(160deg,var(--hdr-from) 0%,var(--hdr-to) 100%);
-  color:#fff;
+  color:var(--on-hdr);
   padding:var(--s3) var(--s4) var(--s4);
   padding-top:max(var(--s3),env(safe-area-inset-top));
   flex:0 0 auto;
@@ -111,6 +112,50 @@ button{font:inherit;color:inherit}
 .hdr-title{font-size:19px;font-weight:700;line-height:1.3;letter-spacing:-.2px}
 .hdr-sub{font-size:13px;opacity:.85;margin-top:1px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ===========================================================
+   ການ໌ດເບີ້ຍຂະຫຍັນ ເທິງສຸດຂອງໜ້າຫຼັກ
+   ພະນັກງານຕ້ອງເຫັນຍອດຂອງຕົນທຸກມື້ ບໍ່ແມ່ນຮູ້ຕອນສິ້ນຮອບ
+   =========================================================== */
+.hero{
+  background:linear-gradient(150deg,var(--hdr-from) 0%,var(--hdr-to) 100%);
+  color:var(--on-hdr);
+  border-radius:var(--r3);
+  padding:var(--s4);
+  box-shadow:var(--sh2);
+  margin-bottom:var(--s4);
+}
+.hero-top{display:flex;align-items:flex-start;gap:var(--s3)}
+.hero-main{flex:1;min-width:0}
+.hero-l{font-size:12.5px;font-weight:600;opacity:.84;letter-spacing:.2px}
+.hero-v{font-size:30px;font-weight:800;line-height:1.25;letter-spacing:-.8px;
+  font-variant-numeric:tabular-nums;margin:2px 0 4px}
+.hero-s{font-size:12.5px;opacity:.84;line-height:1.5}
+.hero.low .hero-v{color:var(--yellow)}
+.hero-ico{
+  flex:0 0 var(--tap);width:var(--tap);height:var(--tap);
+  border-radius:var(--r2);border:0;cursor:pointer;
+  background:rgba(255,255,255,.18);color:var(--on-hdr);
+  font-size:24px;line-height:1;display:grid;place-items:center;
+}
+.hero-ico:active{background:rgba(255,255,255,.3)}
+.hero-chips{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s2);margin-top:var(--s4)}
+.hchip{background:rgba(255,255,255,.14);border-radius:var(--r1);
+  padding:10px 8px;text-align:center;min-width:0}
+.hchip-v{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hchip-l{font-size:10.5px;opacity:.82;margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ແຜ່ນໄອຄອນຂອງແຖວງານ */
+.task-tile{
+  flex:0 0 40px;width:40px;height:40px;border-radius:var(--r2);
+  display:grid;place-items:center;font-size:16px;font-weight:700;
+  background:var(--surface-2);color:var(--brand-text);
+  border:1px solid var(--line);
+}
+.task-tile.on{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+.task-tile.bad{background:var(--bad-bg);color:var(--bad);border-color:transparent}
 
 /* ວົງຄວາມຄືບໜ້າໃນຫົວແອັບ */
 .ring{flex:0 0 46px;width:46px;height:46px;position:relative}
