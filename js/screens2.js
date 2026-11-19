@@ -357,8 +357,31 @@ SCREENS.report = async function (branchFilter) {
     ]);
   });
 
+  /* ໃຜກໍາລັງຢູ່ໃນຮ້ານຕອນນີ້ — ເຊັກອິນແລ້ວຍັງບໍ່ເຊັກເອົາ */
+  const duty = await BONUS.onDuty();
+  const dutyCard = card([
+    h('h3', { class: 'ttl', text: 'ກໍາລັງເຂົ້າວຽກຕອນນີ້' }),
+    ...(duty.length
+      ? duty.map(s2 => {
+          const d2 = shiftDef(s2.shiftKey);
+          const mins = Math.max(0, Math.round((new Date() - new Date(s2.openedAt)) / 60000));
+          return h('div', { class: 'li', 'data-ui': 'content' }, [
+            h('div', { class: 'li-m' }, [
+              h('b', { text: s2.staff + ' · ' + s2.branch }),
+              h('small', { text: `${d2.label} · ເຊັກອິນ ${U.stamp(s2.openedAt).slice(-5)}`
+                + ` · ເຮັດວຽກມາ ${Math.floor(mins / 60)} ຊມ ${mins % 60} ນາທີ`
+                + (s2.lateBy ? ' · ຊ້າ ' + s2.lateBy + ' ນາທີ' : '') })
+            ]),
+            h('span', { class: 'pill ' + (s2.lateBy ? 'bad' : 'ok'),
+                        text: s2.lateBy ? 'ຊ້າ' : 'ຕົງເວລາ' })
+          ]);
+        })
+      : [h('div', { class: 'note', text: 'ຕອນນີ້ບໍ່ມີໃຜເຊັກອິນຢູ່' })])
+  ], 'tasks');
+
   render('ລາຍງານ', (pick || 'ທຸກສາຂາ') + ' · 30 ມື້ຜ່ານມາ', [
     chips,
+    dutyCard,
     /* ກະຕິກາ 4: ຕົວເລກບໍ່ເກີນ 6 ຊ່ອງ */
     h('div', { class: 'stats', 'data-ui': 'content' }, [
       stat('ກະທີ່ປິດແລ້ວ', `${closed.length}/${last30.length}`,
@@ -380,16 +403,23 @@ SCREENS.report = async function (branchFilter) {
       ? card(recent, 'tasks')
       : card([
           h('div', { class: 'note', text: 'ຍັງບໍ່ມີກະໃນຊ່ວງນີ້' }),
-          btn('ໄປເປີດກະ', () => go('home'), 'primary')
+          btn('ໄປເປີດກະ', () => go('home'), 'ghost')
         ]),
+
+    h('h3', { class: 'sec', text: 'ເບີ້ຍຂະຫຍັນ' }),
+    card([
+      h('div', { class: 'muted', text: 'ຄິດຈາກຂໍ້ມູນກະຈິງ ບໍ່ມີການໃຫ້ຄະແນນດ້ວຍມື' }),
+      btn('ເບິ່ງເບີ້ຍຂະຫຍັນລາຍເດືອນ', () => go('bonus'), 'primary')
+    ]),
 
     h('h3', { class: 'sec', text: 'ສົ່ງອອກຂໍ້ມູນ' }),
     card([
       h('div', { class: 'muted', text: 'ໄຟລ໌ CSV ມີຖັນສາຂາຄົບທຸກຊຸດ ເປີດດ້ວຍ Excel ໄດ້' }),
-      btn('ສົ່ງອອກ ກະ + ເງິນສົດ', exportShifts, 'primary', 'ກຳລັງສົ່ງອອກ…'),
+      btn('ສົ່ງອອກ ກະ + ເງິນສົດ', exportShifts, 'ghost', 'ກຳລັງສົ່ງອອກ…'),
       btn('ສົ່ງອອກ ອຸນຫະພູມ', exportTemps, 'ghost', 'ກຳລັງສົ່ງອອກ…'),
       btn('ສົ່ງອອກ ບັນຫາ', exportIssues, 'ghost', 'ກຳລັງສົ່ງອອກ…'),
       btn('ສົ່ງອອກ ສິນຄ້າ', exportStock, 'ghost', 'ກຳລັງສົ່ງອອກ…'),
+      btn('ສົ່ງອອກ ເບີ້ຍຂະຫຍັນ', exportBonus, 'ghost', 'ກຳລັງສົ່ງອອກ…'),
       btn('ດາວໂຫຼດຮູບທັງໝົດ', exportPhotos, 'ghost', 'ກຳລັງດາວໂຫຼດ…')
     ])
   ]);
@@ -458,6 +488,179 @@ async function exportPhotos() {
   U.toast('ດາວໂຫຼດຄົບແລ້ວ');
 }
 
+/* ---------- ເບີ້ຍຂະຫຍັນ ---------- */
+
+/* ແຖບເລືອກເດືອນ — ໃຊ້ຮ່ວມກັນທັງສອງໜ້າ */
+async function monthChips(current, onPick) {
+  const months = (await BONUS.monthsAvailable()).slice(0, 6);
+  return h('div', { class: 'chips' }, months.map(m =>
+    h('button', { class: 'chip' + (m === current ? ' on' : ''), 'data-ui': 'chip',
+                  onclick: () => onPick(m) }, m)));
+}
+
+SCREENS.bonus = async function (ym) {
+  ym = ym || BONUS.thisMonth();
+  const rows = await BONUS.month(ym);
+  const chips = await monthChips(ym, m => go('bonus', m));
+
+  const totalFull = rows.reduce((a, r) => a + r.full, 0);
+  const totalPaid = rows.reduce((a, r) => a + r.paid, 0);
+  const totalCut = totalFull - totalPaid;
+  const perfect = rows.filter(r => r.deducted === 0 && r.shiftCount > 0).length;
+
+  const stat = (label, value, extra, cls = '') => h('div', { class: 'stat ' + cls }, [
+    h('div', { class: 'stat-v', text: value }),
+    h('div', { class: 'stat-l', text: label }),
+    extra ? h('div', { class: 'stat-x', text: extra }) : null
+  ]);
+
+  const list = rows.map(r => h('button', {
+    class: 'li li-tap', 'data-ui': 'content',
+    onclick: () => go('bonusStaff', ym + '|' + r.name)
+  }, [
+    h('div', { class: 'li-m' }, [
+      h('b', { text: r.name + (r.staff.type === 'weekend' ? ' · ພາດທາມ' : '') }),
+      h('small', { text: r.shiftCount + ' ກະ'
+        + (r.deducted ? ' · ຫັກ ' + U.kip(r.deducted) + ' ກີບ' : ' · ບໍ່ມີການຫັກ') })
+    ]),
+    h('span', { class: 'pill ' + (r.pct === 100 ? 'ok' : r.pct >= 70 ? 'todo' : 'bad'),
+                text: U.kip(r.paid) })
+  ]));
+
+  render('ເບີ້ຍຂະຫຍັນ', ym + ' · ' + rows.length + ' ຄົນ', [
+    chips,
+    h('div', { class: 'stats', 'data-ui': 'content' }, [
+      stat('ຈ່າຍຈິງ (ກີບ)', U.kip(totalPaid), 'ເຕັມ ' + U.kip(totalFull)),
+      stat('ຫັກລວມ (ກີບ)', U.kip(totalCut), '', totalCut ? 'bad' : ''),
+      stat('ໄດ້ເຕັມ', String(perfect) + '/' + rows.filter(r => r.shiftCount > 0).length, 'ຄົນ')
+    ]),
+    h('h3', { class: 'sec', text: 'ລາຍຄົນ' }),
+    list.length ? card(list, 'tasks')
+                : card([h('div', { class: 'note', text: 'ເດືອນນີ້ຍັງບໍ່ມີຂໍ້ມູນກະ' }),
+                        btn('ໄປໜ້າຫຼັກ', () => go('home'), 'ghost')]),
+    card([
+      h('div', { class: 'muted',
+        text: 'ກົດຊື່ເພື່ອເບິ່ງວ່າຖືກຫັກຍ້ອນຫຍັງແດ່ ແລະ ບັນທຶກການຫັກເພີ່ມເຊັ່ນ ບໍ່ມາເຮັດວຽກ' })
+    ])
+  ]);
+};
+
+SCREENS.bonusStaff = async function (arg) {
+  const [ym, name] = String(arg || '').split('|');
+  if (!name) return go('bonus');
+  const rows = await BONUS.month(ym);
+  const r = rows.find(x => x.name === name);
+  if (!r) return go('bonus', ym);
+
+  const adjs = (await DB.by('bonusAdj', 'month', ym)).filter(a => a.staffName === name);
+
+  /* ແຕ່ລະກົດທີ່ຖືກຫັກ — ບອກເຫດຜົນເປັນລາຍການ ເພື່ອໃຫ້ພະນັກງານກວດຄືນໄດ້ */
+  const lineCards = r.lines.map(l => card([
+    h('div', { class: 'vrow bad-line' }, [
+      h('span', { text: l.rule.label }),
+      h('b', { text: '-' + U.kip(l.total) })
+    ]),
+    h('div', { class: 'muted', text: l.count + ' ຄັ້ງ × ' + U.kip(l.amount) + ' ກີບ' }),
+    ...l.refs.slice(0, 8).map(ref => h('div', {
+      class: 'li' + (ref.shiftId ? ' li-tap' : ''), 'data-ui': 'content',
+      onclick: ref.shiftId ? () => go('shiftDetail', ref.shiftId) : null
+    }, [
+      h('div', { class: 'li-m' }, [
+        h('b', { text: ref.date || '—' }),
+        h('small', { text: (ref.manual ? 'ຜູ້ຈັດການບັນທຶກ · ' : '') + (ref.text || '') })
+      ])
+    ])),
+    l.refs.length > 8
+      ? h('div', { class: 'muted', text: 'ແລະ ອີກ ' + (l.refs.length - 8) + ' ລາຍການ' })
+      : null
+  ]));
+
+  /* ບັນທຶກການຫັກເອງ — ສໍາລັບສິ່ງທີ່ລະບົບຮູ້ເອງບໍ່ໄດ້ ເຊັ່ນ ບໍ່ມາເຮັດວຽກ */
+  const form = { ruleKey: 'absent', amount: BONUS.amountOf('absent'), date: U.today(), note: '' };
+  const amtIn = input({ type: 'number', value: form.amount,
+                        oninput: e => form.amount = U.num(e.target.value) });
+  const addCard = card([
+    h('h3', { class: 'ttl', text: 'ບັນທຶກການຫັກເອງ' }),
+    h('div', { class: 'muted', text: 'ໃຊ້ກັບສິ່ງທີ່ລະບົບກວດເອງບໍ່ໄດ້ ເຊັ່ນ ບໍ່ມາເຮັດວຽກ ຫຼື ຜິດກົດລະບຽບ' }),
+    rowLabel('ເຫດຜົນ', select(
+      CONFIG.bonusRules.map(x => ({ value: x.key, label: x.label })), form.ruleKey,
+      e => { form.ruleKey = e.target.value; form.amount = BONUS.amountOf(form.ruleKey);
+             amtIn.value = form.amount; })),
+    rowLabel('ວັນທີ', input({ type: 'date', value: form.date, oninput: e => form.date = e.target.value })),
+    rowLabel('ຈໍານວນທີ່ຫັກ (ກີບ)', amtIn),
+    rowLabel('ໝາຍເຫດ', input({ placeholder: 'ເຊັ່ນ ບໍ່ມາ ແລະ ບໍ່ແຈ້ງ', oninput: e => form.note = e.target.value })),
+    btn('ບັນທຶກການຫັກ', async () => {
+      if (!form.amount || form.amount <= 0) return U.toast('ໃສ່ຈໍານວນທີ່ຫັກກ່ອນ', 'err');
+      const rule = CONFIG.bonusRules.find(x => x.key === form.ruleKey);
+      const ok = await confirmSheet({
+        title: 'ຫັກເບີ້ຍຂະຫຍັນ?',
+        lines: [name, rule.label, '-' + U.kip(form.amount) + ' ກີບ · ວັນທີ ' + form.date,
+                'ຫັກແລ້ວຍັງລຶບອອກໄດ້ໃນໜ້ານີ້'],
+        confirmLabel: 'ຫັກ ' + U.kip(form.amount), danger: true
+      });
+      if (!ok) return;
+      await DB.put('bonusAdj', {
+        month: ym, staffName: name, ruleKey: form.ruleKey, amount: form.amount,
+        date: form.date, note: form.note, ts: new Date().toISOString()
+      });
+      U.toast('ບັນທຶກແລ້ວ');
+      go('bonusStaff', arg);
+    }, 'danger')
+  ]);
+
+  const adjCard = adjs.length ? card([
+    h('h3', { class: 'ttl', text: 'ການຫັກທີ່ບັນທຶກເອງ' }),
+    ...adjs.map(a => h('div', { class: 'li', 'data-ui': 'content' }, [
+      h('div', { class: 'li-m' }, [
+        h('b', { text: (CONFIG.bonusRules.find(x => x.key === a.ruleKey) || {}).label || a.ruleKey }),
+        h('small', { text: a.date + (a.note ? ' · ' + a.note : '') })
+      ]),
+      h('span', { class: 'pill bad', text: '-' + U.kip(a.amount) }),
+      h('button', { class: 'x', text: '✕', onclick: async () => {
+        await DB.del('bonusAdj', a.id);
+        U.toast('ລຶບການຫັກແລ້ວ');
+        go('bonusStaff', arg);
+      } })
+    ]))
+  ], 'tasks') : null;
+
+  render(name, ym + ' · ' + r.shiftCount + ' ກະ', [
+    card([
+      h('div', { class: 'vrow' }, [h('span', { text: 'ເບີ້ຍເຕັມ' }), h('b', { text: U.kip(r.full) + ' ກີບ' })]),
+      h('div', { class: 'vrow bad-line' }, [h('span', { text: 'ຫັກທັງໝົດ' }), h('b', { text: '-' + U.kip(r.deducted) })]),
+      /* ຖ້າລວມການຫັກແລ້ວເກີນເບີ້ຍເຕັມ ຕ້ອງບອກ ບໍ່ດັ່ງນັ້ນຕົວເລກຂ້າງລຸ່ມຈະບໍ່ຕົງກັບລາຍການ */
+      r.capped
+        ? h('div', { class: 'warn small',
+            text: 'ລາຍການຫັກລວມ ' + U.kip(r.rawDeducted) + ' ກີບ ເກີນເບີ້ຍເຕັມ — ຫັກໄດ້ສູງສຸດເທົ່າເບີ້ຍເຕັມ ບໍ່ຕິດລົບ' })
+        : null,
+      h('div', { class: 'vrow big-v' }, [h('span', { text: 'ໄດ້ຈິງ' }), h('b', { text: U.kip(r.paid) + ' ກີບ' })]),
+      h('div', { class: 'muted', text: 'ຄິດເປັນ ' + r.pct + '% ຂອງເບີ້ຍເຕັມ' })
+    ]),
+    r.lines.length ? h('h3', { class: 'sec', text: 'ຫັກຍ້ອນຫຍັງແດ່' }) : null,
+    ...lineCards,
+    !r.lines.length ? card([h('div', { class: 'note', text: 'ເດືອນນີ້ບໍ່ມີການຫັກ — ໄດ້ເບີ້ຍເຕັມ' })]) : null,
+    adjCard,
+    addCard,
+    btn('ກັບໄປລາຍຊື່', () => go('bonus', ym), 'ghost')
+  ]);
+};
+
+async function exportBonus() {
+  const ym = BONUS.thisMonth();
+  const rows = await BONUS.month(ym);
+  const head = ['ເດືອນ', 'ພະນັກງານ', 'ປະເພດ', 'ຈໍານວນກະ', 'ເບີ້ຍເຕັມ', 'ຫັກ', 'ໄດ້ຈິງ', '%',
+                ...CONFIG.bonusRules.map(r => r.label)];
+  const body = rows.map(r => [
+    ym, r.name, r.staff.type === 'weekend' ? 'ພາດທາມ' : 'ປະຈໍາ', r.shiftCount,
+    r.full, r.deducted, r.paid, r.pct,
+    ...CONFIG.bonusRules.map(rule => {
+      const l = r.lines.find(x => x.rule.key === rule.key);
+      return l ? l.count : 0;
+    })
+  ]);
+  U.downloadCsv('gomart_bonus_' + ym + '.csv', [head, ...body]);
+}
+
 /* ---------- ຕັ້ງຄ່າ ---------- */
 SCREENS.config = async function () {
   const st = S.settings;
@@ -489,10 +692,72 @@ SCREENS.config = async function () {
     return card([h('h3', { class: 'ttl', text: title }), wrap]);
   };
 
+  /* ພະນັກງານ — ຊື່ + ກະປະຈໍາ + ປະເພດ ໃຊ້ທັງໜ້າເຊັກອິນ ແລະ ການຄິດເບີ້ຍຂະຫຍັນ */
+  function staffEditor() {
+    const wrap = h('div', {});
+    const save = () => saveSetting('staff', st.staff);
+    const redraw = () => {
+      wrap.innerHTML = '';
+      st.staff.forEach((p, i) => wrap.appendChild(h('div', { class: 'li', 'data-ui': 'content' }, [
+        /* ທຸກຊ່ອງມີປ້າຍຊື່ເໜືອຊ່ອງ — ຄໍາໃບ້ໃນຊ່ອງຢ່າງດຽວຈະຫາຍໄປຕອນພິມ */
+        h('div', { class: 'li-m' }, [
+          rowLabel('ຊື່ພະນັກງານ', input({
+            value: p.name, placeholder: 'ຊື່ພະນັກງານ',
+            onchange: e => { st.staff[i].name = e.target.value.trim(); save(); } })),
+          h('div', { class: 'addrow' }, [
+            rowLabel('ກະປະຈໍາ', select([{ value: '', label: '— ບໍ່ກໍານົດ —' },
+                    ...st.shifts.map(x => ({ value: x.key, label: x.label }))],
+                   p.shiftKey || '', e => { st.staff[i].shiftKey = e.target.value || null; save(); })),
+            rowLabel('ປະເພດ', select([{ value: 'full', label: 'ປະຈໍາ' }, { value: 'weekend', label: 'ພາດທາມ' }],
+                   p.type || 'full', e => { st.staff[i].type = e.target.value; save(); }))
+          ])
+        ]),
+        h('button', { class: 'x', text: '✕', onclick: async () => {
+          st.staff = st.staff.filter((_, j) => j !== i); await save(); redraw();
+        } })
+      ])));
+      wrap.appendChild(h('div', { class: 'addrow' }, [
+        btn('+ ເພີ່ມພະນັກງານ', async () => {
+          st.staff = [...st.staff, { name: '', shiftKey: null, type: 'full' }];
+          await save(); redraw();
+        }, 'sm')
+      ]));
+    };
+    redraw();
+    return card([
+      h('h3', { class: 'ttl', text: 'ພະນັກງານ' }),
+      h('div', { class: 'muted', text: 'ຊື່ທີ່ໃສ່ນີ້ຈະຂຶ້ນໃຫ້ເລືອກຕອນເຊັກອິນ ແລະ ໃຊ້ຄິດເບີ້ຍຂະຫຍັນ' }),
+      wrap
+    ]);
+  }
+
+  /* ເບີ້ຍຂະຫຍັນ — ຈໍານວນເງິນທັງໝົດແກ້ໄດ້ຢູ່ນີ້ບ່ອນດຽວ */
+  const bonusCard = card([
+    h('h3', { class: 'ttl', text: 'ເບີ້ຍຂະຫຍັນ' }),
+    h('div', { class: 'muted', text: 'ທຸກຄົນເລີ່ມເດືອນດ້ວຍເບີ້ຍເຕັມ ແລ້ວຫັກລົງຕາມສິ່ງທີ່ເກີດຂຶ້ນຈິງ' }),
+    rowLabel('ເບີ້ຍເຕັມ ພະນັກງານປະຈໍາ (ກີບ/ເດືອນ)',
+      input({ type: 'number', value: st.bonusFull,
+              onchange: e => saveSetting('bonusFull', U.num(e.target.value)) })),
+    rowLabel('ເບີ້ຍເຕັມ ພາດທາມ (ກີບ/ເດືອນ)',
+      input({ type: 'number', value: st.bonusFullWeekend,
+              onchange: e => saveSetting('bonusFullWeekend', U.num(e.target.value)) })),
+    rowLabel('ອອກວຽກກ່ອນເວລາເກີນ (ນາທີ) = ຖືວ່າອອກກ່ອນ',
+      input({ type: 'number', value: st.earlyMinutes,
+              onchange: e => saveSetting('earlyMinutes', U.num(e.target.value)) })),
+    h('div', { class: 'muted', style: 'margin-top:14px', text: 'ຫັກຄັ້ງລະເທົ່າໃດ — ຮຽງຈາກຄວາມຮັບຜິດຊອບໜັກສຸດລົງມາ' }),
+    ...CONFIG.bonusRules.map(r => rowLabel(
+      r.label + ' (ນໍ້າໜັກ ' + r.weight + ')',
+      input({ type: 'number', value: BONUS.amountOf(r.key),
+              onchange: e => {
+                const next = { ...(st.bonusAmounts || {}), [r.key]: U.num(e.target.value) };
+                saveSetting('bonusAmounts', next);
+              } })))
+  ]);
+
   render('ຕັ້ງຄ່າ', 'ລະບົບ v' + CONFIG.version, [
     listEditor('branches', 'ສາຂາ', 'ຊື່ສາຂາໃໝ່'),
     listEditor('zones', 'ໂຊນສິນຄ້າ', 'ຊື່ໂຊນໃໝ່'),
-    listEditor('staff', 'ພະນັກງານ', 'ຊື່ພະນັກງານ'),
+    staffEditor(),
     card([
       h('h3', { class: 'ttl', text: 'ເກນ' }),
       rowLabel('ສ່ວນຕ່າງເງິນສົດທີ່ຍອມຮັບໄດ້ (ກີບ)',
@@ -510,6 +775,7 @@ SCREENS.config = async function () {
         input({ type: 'time', value: sdef.end, onchange: e => { st.shifts[i].end = e.target.value; saveSetting('shifts', st.shifts); } })
       ]))
     ]),
+    bonusCard,
     card([
       h('h3', { class: 'ttl', text: 'ໜ້າຕາ' }),
       h('div', { class: 'muted', text: 'ໂໝດມືດຊ່ວຍເວລາເຮັດກະກາງຄືນ ຕັ້ງແຍກຕໍ່ເຄື່ອງ' }),

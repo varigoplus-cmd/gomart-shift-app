@@ -1,7 +1,7 @@
 /* ຖານຂໍ້ມູນທ້ອງຖິ່ນ (IndexedDB) — ໃຊ້ໄດ້ແມ່ນແຕ່ບໍ່ມີອິນເຕີເນັດ */
 const DB = (() => {
   const NAME = 'gomart_shift';
-  const VERSION = 2;
+  const VERSION = 3;
   const STORES = {
     settings: { keyPath: 'key' },
     drafts:   { keyPath: 'id', indexes: ['shiftId'] },
@@ -11,7 +11,9 @@ const DB = (() => {
     temps:    { keyPath: 'id', indexes: ['shiftId'] },
     cash:     { keyPath: 'id', indexes: ['shiftId'] },
     issues:   { keyPath: 'id', indexes: ['shiftId', 'status', 'branch'] },
-    stock:    { keyPath: 'id', indexes: ['shiftId', 'kind'] }
+    stock:    { keyPath: 'id', indexes: ['shiftId', 'kind'] },
+    /* ການຫັກເບີ້ຍທີ່ຜູ້ຈັດການບັນທຶກເອງ ເຊັ່ນ ບໍ່ມາເຮັດວຽກ */
+    bonusAdj: { keyPath: 'id', indexes: ['month', 'staffName'] }
   };
 
   let _db = null;

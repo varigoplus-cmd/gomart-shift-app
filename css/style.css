@@ -416,9 +416,10 @@ select.in{appearance:none;background-image:
 .vrow.bad-line{color:var(--bad);font-weight:600}
 .vrow.big-v{border-top:1.5px solid var(--line);margin-top:var(--s2);
   padding-top:10px;font-size:18px;font-weight:700}
-.varbox.alert 
-.vrow.bad-line{color:var(--bad);font-weight:600}
-.vrow.big-v{color:var(--bad)}
+/* ສະເພາະຕອນສ່ວນຕ່າງເກີນເກນເທົ່ານັ້ນຈຶ່ງເປັນສີແດງ
+   ເດີມ .vrow.big-v ບໍ່ໄດ້ຢູ່ໃນຂອບເຂດ .varbox.alert ຈຶ່ງແດງທຸກບ່ອນ */
+.varbox.alert .vrow.bad-line{color:var(--bad);font-weight:600}
+.varbox.alert .vrow.big-v{color:var(--bad)}
 
 /* ແຖບສະຫຼຸບຕິດລຸ່ມ — ເຫັນສ່ວນຕ່າງຕະຫຼອດເວລາພິມ */
 .sticky-sum{

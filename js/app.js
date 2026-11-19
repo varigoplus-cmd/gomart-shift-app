@@ -7,17 +7,34 @@ let S = {            /* ສະຖານະແອັບ */
 };
 
 /* ================= ຕັ້ງຄ່າ ================= */
+/* ລາຍຊື່ພະນັກງານເຄີຍເກັບເປັນສະຕຣິງລ້ວນ ດຽວນີ້ເປັນ object ທີ່ມີກະ ແລະ ປະເພດ
+ * ແປງໃຫ້ອັດຕະໂນມັດ ເພື່ອບໍ່ໃຫ້ເຄື່ອງທີ່ໃຊ້ຢູ່ແລ້ວຂໍ້ມູນຫາຍ */
+function normStaff(raw) {
+  if (!raw || !raw.length) return CONFIG.defaults.staff.map(x => ({ ...x }));
+  return raw.map(x => typeof x === 'string'
+    ? { name: x, shiftKey: null, type: 'full' }
+    : { shiftKey: null, type: 'full', ...x });
+}
+
 async function loadSettings() {
   const d = CONFIG.defaults;
+  const rawStaff = await DB.setting('staff');
   S.settings = {
     branches: await DB.setting('branches') || d.branches.slice(),
-    staff: await DB.setting('staff') || [],
+    staff: normStaff(rawStaff),
     zones: await DB.setting('zones') || CONFIG.zones.slice(),
     shifts: await DB.setting('shifts') || d.shifts.map(x => ({ ...x })),
     cashVarianceLimit: await DB.setting('cashVarianceLimit') ?? d.cashVarianceLimit,
     lateMinutes: await DB.setting('lateMinutes') ?? d.lateMinutes,
-    zonesPerShift: await DB.setting('zonesPerShift') ?? d.zonesPerShift
+    earlyMinutes: await DB.setting('earlyMinutes') ?? d.earlyMinutes,
+    zonesPerShift: await DB.setting('zonesPerShift') ?? d.zonesPerShift,
+    bonusFull: await DB.setting('bonusFull') ?? d.bonusFull,
+    bonusFullWeekend: await DB.setting('bonusFullWeekend') ?? d.bonusFullWeekend,
+    bonusAmounts: await DB.setting('bonusAmounts') || {}
   };
+  /* ຂຽນຮູບແບບໃໝ່ກັບລົງເຄື່ອງ ເພື່ອໃຫ້ໜ້າຕັ້ງຄ່າແກ້ໄດ້ເລີຍ */
+  if (JSON.stringify(rawStaff) !== JSON.stringify(S.settings.staff))
+    await DB.setting('staff', S.settings.staff);
 }
 const saveSetting = (k, v) => { S.settings[k] = v; return DB.setting(k, v); };
 
@@ -238,9 +255,10 @@ function btn(text, onclick, cls = '', busyText = 'ກຳລັງບັນທຶ
 }
 const rowLabel = (label, kids) => h('label', { class: 'field' }, [h('span', { class: 'flabel', text: label }), ...(Array.isArray(kids) ? kids : [kids])]);
 
-function input(attrs = {}) { return h('input', { class: 'in', ...attrs }); }
+/* data-ui="skip": ຊ່ອງປ້ອນມີພື້ນທຶບໃນໂໝດມືດ ຕົວກວດ UX ຈຶ່ງນັບເປັນປຸ່ມຫຼັກ ຖ້າບໍ່ບອກມັນ */
+function input(attrs = {}) { return h('input', { class: 'in', 'data-ui': 'skip', ...attrs }); }
 function select(options, value, onchange, attrs = {}) {
-  const s = h('select', { class: 'in', onchange, ...attrs },
+  const s = h('select', { class: 'in', 'data-ui': 'skip', onchange, ...attrs },
     options.map(o => {
       const val = typeof o === 'string' ? o : o.value;
       const lab = typeof o === 'string' ? o : o.label;
@@ -384,37 +402,75 @@ SCREENS.home = async function () {
       btn('ລຶບກະນີ້ຖິ້ມ', cancelShift, 'danger-quiet')
     ], 'danger-zone')
   ];
-  render(sh.branch, `${def.label} · ${sh.staff} · ${sh.date}`, body,
+  render(sh.branch,
+         `${def.label} · ${sh.staff} · ເຊັກອິນ ${U.stamp(sh.openedAt).slice(-5)}`, body,
          progressRing(doneN, TASKS.length));
 };
 
 function screenStartShift() {
   const st = S.settings;
-  let branch = st.branches[0], shiftKey = st.shifts[0].key, staff = '';
-  const staffIn = st.staff.length
-    ? select(['— ເລືອກຊື່ —', ...st.staff], '', e => staff = e.target.value)
-    : input({ placeholder: 'ຊື່ພະນັກງານ', oninput: e => staff = e.target.value });
+  const people = BONUS.roster();
+  let branch = st.branches[0];
+  let name = '';
+  let shiftKey = st.shifts[0].key;
+
+  const def = () => st.shifts.find(x => x.key === shiftKey) || st.shifts[0];
+
+  /* ບອກລ່ວງໜ້າວ່າເຊັກອິນຕອນນີ້ຈະຖືກບັນທຶກແນວໃດ — ຢ່າໃຫ້ຮູ້ຕອນຫຼັງ */
+  const info = h('div', { class: 'note' }, '');
+  function refresh() {
+    const d = def();
+    const late = U.minutesLate(d.start);
+    const isLate = late > st.lateMinutes;
+    info.className = 'note' + (isLate ? ' warn' : '');
+    info.textContent = isLate
+      ? `ເວລານີ້ ${U.nowTime()} · ກະເລີ່ມ ${d.start} — ຊ້າ ${late} ນາທີ ຈະຖືກບັນທຶກ`
+      : `ເວລານີ້ ${U.nowTime()} · ກະ ${d.start}-${d.end} — ເຂົ້າວຽກຕົງເວລາ`;
+  }
+
+  const shiftSel = select(
+    st.shifts.map(x => ({ value: x.key, label: `${x.label} (${x.start}-${x.end})` })),
+    shiftKey, e => { shiftKey = e.target.value; refresh(); });
+
+  const staffSel = people.length
+    ? select(
+        [{ value: '', label: '— ເລືອກຊື່ —' },
+         ...people.map(p => ({ value: p.name,
+           label: p.name + (p.type === 'weekend' ? ' · ພາດທາມ' : '') }))],
+        '', e => {
+          name = e.target.value;
+          const p = people.find(x => x.name === name);
+          /* ເລືອກຊື່ແລ້ວ ກະຂອງຄົນນັ້ນຂຶ້ນເອງ — ຫຼຸດການເລືອກຜິດກະ */
+          if (p && p.shiftKey) { shiftKey = p.shiftKey; shiftSel.value = shiftKey; }
+          refresh();
+        })
+    : input({ placeholder: 'ຊື່ພະນັກງານ', oninput: e => name = e.target.value });
+
+  refresh();
 
   const body = card([
-    h('h2', { class: 'ttl', text: 'ເລີ່ມກະໃໝ່' }),
+    h('h2', { class: 'ttl', text: 'ເຊັກອິນ ເຂົ້າວຽກ' }),
     rowLabel('ສາຂາ', select(st.branches, branch, e => branch = e.target.value)),
-    rowLabel('ກະ', select(st.shifts.map(s => ({ value: s.key, label: `${s.label} (${s.start}-${s.end})` })),
-                          shiftKey, e => shiftKey = e.target.value)),
-    rowLabel('ຊື່ພະນັກງານ', staffIn),
-    btn('ເປີດກະ', async () => {
-      const name = (staff || '').trim();
-      if (!name || name.startsWith('—')) return U.toast('ກະລຸນາໃສ່ຊື່ພະນັກງານ', 'err');
-      const def = st.shifts.find(s => s.key === shiftKey);
-      const lateBy = U.minutesLate(def.start);
+    rowLabel('ຊື່ພະນັກງານ', staffSel),
+    rowLabel('ກະ', shiftSel),
+    info,
+    btn('ເຊັກອິນ', async () => {
+      const nm = (name || '').trim();
+      if (!nm || nm.startsWith('—')) return U.toast('ກະລຸນາເລືອກຊື່ພະນັກງານ', 'err');
+      const d = def();
+      const lateBy = U.minutesLate(d.start);
+      const p = people.find(x => x.name === nm);
       const shift = {
-        id: DB.uid(), branch, shiftKey, staff: name,
+        id: DB.uid(), branch, shiftKey, staff: nm,
+        staffType: p ? p.type : 'full',
         date: U.today(), openedAt: new Date().toISOString(),
         lateBy: lateBy > st.lateMinutes ? lateBy : 0,
-        float: null, status: 'open'
+        earlyBy: 0, float: null, status: 'open'
       };
       await DB.put('shifts', shift);
-      if (!st.staff.includes(name)) await saveSetting('staff', [...st.staff, name]);
-      U.toast('ເປີດກະແລ້ວ');
+      if (!people.some(x => x.name === nm))
+        await saveSetting('staff', [...st.staff, { name: nm, shiftKey, type: 'full' }]);
+      U.toast('ເຊັກອິນ ' + U.nowTime() + ' ແລ້ວ');
       go('home');
     }, 'primary big-btn')
   ]);
@@ -470,13 +526,20 @@ async function closeShift() {
   const sh = S.shift; if (!sh) return;
   const p = await progress(sh);
   const v = p.cash ? p.cash.variance : 0;
+  const def = shiftDef(sh.shiftKey);
+  /* ອອກກ່ອນເວລາ = ເຊັກເອົາກ່ອນເວລາຈົບກະ ເກີນເກນນາທີທີ່ຕັ້ງໄວ້ */
+  const early = -U.minutesLate(def.end);
+  const earlyBy = early > S.settings.earlyMinutes ? early : 0;
   const lines = [
+    'ເຊັກເອົາເວລາ ' + U.nowTime() + ' (ກະຈົບ ' + def.end + ')',
     'ສ່ວນຕ່າງເງິນສົດ: ' + U.kip(v) + ' ກີບ',
     'ຫຼັງປິດກະແລ້ວ ຈະແກ້ໄຂຂໍ້ມູນບໍ່ໄດ້ອີກ'
   ];
+  if (earlyBy) lines.push('⚠ ອອກກ່ອນເວລາ ' + earlyBy + ' ນາທີ ຈະຖືກບັນທຶກ ແລະ ມີຜົນກັບເບີ້ຍຂະຫຍັນ');
   if (Math.abs(v) > S.settings.cashVarianceLimit) lines.push('⚠ ສ່ວນຕ່າງເກີນເກນ ຜູ້ຈັດການຈະເຫັນລາຍການນີ້');
-  if (!await confirmSheet({ title: 'ປິດກະ?', lines, confirmLabel: 'ປິດກະ' })) return;
+  if (!await confirmSheet({ title: 'ເຊັກເອົາ ແລະ ປິດກະ?', lines, confirmLabel: 'ເຊັກເອົາ' })) return;
   sh.status = 'closed';
+  sh.earlyBy = earlyBy;
   sh.closedAt = new Date().toISOString();
   await DB.put('shifts', sh);
   await clearShiftDrafts(sh.id);
