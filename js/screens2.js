@@ -1,123 +1,4 @@
-/* ໜ້າຈໍ: ສິນຄ້າ · ບັນຫາ · ລາຍງານ · ຕັ້ງຄ່າ */
-
-/* ---------- ສິນຄ້າ (ເມນູ) ---------- */
-SCREENS.stock = async function () {
-  const sh = S.shift;
-  const rows = sh ? await DB.by('stock', 'shiftId', sh.id) : [];
-  const nNear = rows.filter(r => r.kind === 'nearout').length;
-  const nExp = rows.filter(r => r.kind === 'expired').length;
-  /* ຍັງບໍ່ໄດ້ເປີດກະ — ລາຍການຕ້ອງກົດບໍ່ໄດ້ ແລະ ມີທາງໄປຕໍ່ */
-  if (!sh) {
-    return render('ສິນຄ້າ', 'ຍັງບໍ່ໄດ້ເປີດກະ', [
-      card([
-        h('div', { class: 'note', text: 'ຕ້ອງເປີດກະກ່ອນ ຈຶ່ງຈະບັນທຶກລາຍການສິນຄ້າໄດ້' }),
-        btn('ໄປເປີດກະ', () => go('home'), 'primary')
-      ]),
-      card([
-        taskRow('ສິນຄ້າໃກ້ໝົດ (ສັ່ງຊື້)', false, null, '', { disabled: true }),
-        taskRow('ສິນຄ້າໝົດອາຍຸ / ເສຍຫາຍ', false, null, '', { disabled: true }),
-        taskRow('ກວດນັບໂຊນສິນຄ້າ', false, null, '', { disabled: true })
-      ], 'tasks')
-    ]);
-  }
-
-  render('ສິນຄ້າ', sh.branch, [
-    card([
-      taskRow('ສິນຄ້າໃກ້ໝົດ (ສັ່ງຊື້)', nNear > 0, () => go('nearout'), `${nNear} ລາຍການ`),
-      taskRow('ສິນຄ້າໝົດອາຍຸ / ເສຍຫາຍ', nExp > 0, () => go('expired'), `${nExp} ລາຍການ`),
-      taskRow('ກວດນັບໂຊນສິນຄ້າ', false, () => go('zone'))
-    ], 'tasks')
-  ]);
-};
-
-/* ---------- ສິນຄ້າໃກ້ໝົດ ---------- */
-SCREENS.nearout = async function () {
-  const sh = S.shift; if (!sh) return go('stock');
-  const rows = (await DB.by('stock', 'shiftId', sh.id)).filter(r => r.kind === 'nearout');
-  const f = { name: '', qty: '', rop: '', order: '', checkedStore: false };
-
-  const list = rows.length ? card(rows.map(r => h('div', { class: 'li', 'data-ui': 'content' }, [
-    h('div', { class: 'li-m' }, [
-      h('b', { text: r.name }),
-      h('small', { text: `ເຫຼືອ ${r.qty} · ROP ${r.rop || '—'} · ສັ່ງ ${r.order || '—'}${r.checkedStore ? ' · ກວດສາງແລ້ວ' : ''}` })
-    ]),
-    h('button', { class: 'x', text: '✕', onclick: async () => { await DB.del('stock', r.id); go('nearout'); } })
-  ])), 'tasks') : card([h('div', { class: 'note', text: 'ຍັງບໍ່ມີລາຍການ' })]);
-
-  const nameIn = input({ placeholder: 'ຊື່ສິນຄ້າ', oninput: e => f.name = e.target.value });
-  const qtyIn = input({ type: 'number', placeholder: 'ຈໍານວນຄົງເຫຼືອ', oninput: e => f.qty = e.target.value });
-  const ropIn = input({ type: 'number', placeholder: 'ຈຸດສັ່ງຊື້ (ROP)', oninput: e => f.rop = e.target.value });
-  const ordIn = input({ type: 'number', placeholder: 'ຈໍານວນທີ່ຕ້ອງສັ່ງ', oninput: e => f.order = e.target.value });
-  const chk = h('input', { type: 'checkbox', onchange: e => f.checkedStore = e.target.checked });
-
-  render('ສິນຄ້າໃກ້ໝົດ', `${rows.length} ລາຍການ`, [
-    card([
-      h('h3', { class: 'ttl', text: 'ເພີ່ມລາຍການ' }),
-      rowLabel('ຊື່ສິນຄ້າ', nameIn),
-      rowLabel('ຈໍານວນຄົງເຫຼືອ', qtyIn),
-      rowLabel('ຈຸດສັ່ງຊື້ (ROP)', ropIn),
-      rowLabel('ຈໍານວນທີ່ຕ້ອງສັ່ງ', ordIn),
-      h('label', { class: 'cbrow' }, [chk, h('span', { text: 'ກວດຈໍານວນຈິງໃນສາງແລ້ວ' })]),
-      btn('ເພີ່ມ', async () => {
-        if (!f.name.trim()) return U.toast('ໃສ່ຊື່ສິນຄ້າ', 'err');
-        if (!f.checkedStore) return U.toast('ຕ້ອງກວດຈໍານວນຈິງໃນສາງກ່ອນ', 'err');
-        await DB.put('stock', {
-          shiftId: sh.id, kind: 'nearout', branch: sh.branch, date: sh.date, staff: sh.staff,
-          name: f.name.trim(), qty: U.num(f.qty), rop: U.num(f.rop), order: U.num(f.order),
-          checkedStore: true, status: 'ລໍຖ້າສັ່ງ', ts: new Date().toISOString()
-        });
-        U.toast('ເພີ່ມແລ້ວ'); go('nearout');
-      }, 'primary')
-    ]),
-    list,
-    card([btn('ກັບ', () => go('stock'), 'ghost')])
-  ]);
-};
-
-/* ---------- ສິນຄ້າໝົດອາຍຸ / ເສຍຫາຍ ---------- */
-SCREENS.expired = async function () {
-  const sh = S.shift; if (!sh) return go('stock');
-  const rows = (await DB.by('stock', 'shiftId', sh.id)).filter(r => r.kind === 'expired');
-  const total = rows.reduce((s, r) => s + r.value, 0);
-  const f = { name: '', barcode: '', qty: '', unit: '', expiry: '', price: '', action: '' };
-
-  const list = rows.length ? card(rows.map(r => h('div', { class: 'li', 'data-ui': 'content' }, [
-    h('div', { class: 'li-m' }, [
-      h('b', { text: r.name }),
-      h('small', { text: `${r.qty} ${r.unit || ''} · ໝົດອາຍຸ ${r.expiry || '—'} · ມູນຄ່າ ${U.kip(r.value)} ກີບ · ${r.actionLabel}` })
-    ]),
-    h('button', { class: 'x', text: '✕', onclick: async () => { await DB.del('stock', r.id); go('expired'); } })
-  ])), 'tasks') : card([h('div', { class: 'note', text: 'ຍັງບໍ່ມີລາຍການ' })]);
-
-  render('ສິນຄ້າໝົດອາຍຸ / ເສຍຫາຍ', `ມູນຄ່າລວມ ${U.kip(total)} ກີບ`, [
-    card([
-      h('h3', { class: 'ttl', text: 'ເພີ່ມລາຍການ' }),
-      rowLabel('ຊື່ສິນຄ້າ', input({ oninput: e => f.name = e.target.value })),
-      rowLabel('ບາໂຄດ / ລະຫັດ', input({ oninput: e => f.barcode = e.target.value })),
-      rowLabel('ຈໍານວນ', input({ type: 'number', oninput: e => f.qty = e.target.value })),
-      rowLabel('ຫົວໜ່ວຍ', input({ placeholder: 'ອັນ / ຂວດ / ຖົງ', oninput: e => f.unit = e.target.value })),
-      rowLabel('ວັນໝົດອາຍຸ', input({ type: 'date', oninput: e => f.expiry = e.target.value })),
-      rowLabel('ລາຄາຕໍ່ຫົວໜ່ວຍ (ກີບ)', input({ type: 'number', oninput: e => f.price = e.target.value })),
-      rowLabel('ການຈັດການ', select(['— ເລືອກ —', ...CONFIG.disposalActions.map(a => `${a.code}. ${a.label}`)],
-                                   '', e => f.action = e.target.value)),
-      btn('ເພີ່ມ', async () => {
-        if (!f.name.trim()) return U.toast('ໃສ່ຊື່ສິນຄ້າ', 'err');
-        if (!f.action || f.action.startsWith('—')) return U.toast('ເລືອກວິທີຈັດການ', 'err');
-        const value = U.num(f.qty) * U.num(f.price);
-        const daysLeft = f.expiry ? Math.round((new Date(f.expiry) - new Date()) / 86400000) : null;
-        await DB.put('stock', {
-          shiftId: sh.id, kind: 'expired', branch: sh.branch, date: sh.date, staff: sh.staff,
-          name: f.name.trim(), barcode: f.barcode, qty: U.num(f.qty), unit: f.unit,
-          expiry: f.expiry, daysLeft, price: U.num(f.price), value,
-          actionCode: U.num(f.action), actionLabel: f.action, ts: new Date().toISOString()
-        });
-        U.toast('ເພີ່ມແລ້ວ'); go('expired');
-      }, 'primary')
-    ]),
-    list,
-    card([btn('ກັບ', () => go('stock'), 'ghost')])
-  ]);
-};
+/* ໜ້າຈໍ: ບັນຫາ · ລາຍງານ · ເບີ້ຍຂະຫຍັນ · ຕັ້ງຄ່າ */
 
 /* ---------- ລາຍລະອຽດກະທີ່ປິດແລ້ວ ---------- */
 SCREENS.shiftDetail = async function (shiftId) {
@@ -296,8 +177,8 @@ SCREENS.issueNew = async function () {
 
 /* ---------- ລາຍງານ / Dashboard ---------- */
 SCREENS.report = async function (branchFilter) {
-  const [shifts, cash, issues, temps, stock] = await Promise.all([
-    DB.all('shifts'), DB.all('cash'), DB.all('issues'), DB.all('temps'), DB.all('stock')
+  const [shifts, cash, issues, temps] = await Promise.all([
+    DB.all('shifts'), DB.all('cash'), DB.all('issues'), DB.all('temps')
   ]);
   /* ກະທີ່ຖືກລຶບບໍ່ນັບເຂົ້າສະຖິຕິ */
   const all = shifts.filter(s => s.status !== 'cancelled');
@@ -319,8 +200,6 @@ SCREENS.report = async function (branchFilter) {
   const openIssues = issues.filter(i => i.status !== 'ແກ້ແລ້ວ' && (!pick || i.branch === pick)).length;
   const outOfRange = temps.filter(t => ids.has(t.shiftId) && t.min !== null && t.celsius !== null
                                     && (t.celsius < t.min || t.celsius > t.max)).length;
-  const lossValue = stock.filter(r => r.kind === 'expired' && (!pick || r.branch === pick))
-                         .reduce((s, r) => s + r.value, 0);
 
   const stat = (label, value, extra, cls = '') => h('div', { class: 'stat ' + cls }, [
     h('div', { class: 'stat-v', text: value }),
@@ -395,9 +274,6 @@ SCREENS.report = async function (branchFilter) {
       stat('ອຸນຫະພູມນອກເກນ', String(outOfRange), '', outOfRange ? 'bad' : ''),
       stat('ບັນຫາຍັງບໍ່ແກ້', String(openIssues), '', openIssues ? 'bad' : '')
     ]),
-    lossValue ? card([h('div', { class: 'vrow' },
-      [h('span', { text: 'ມູນຄ່າສິນຄ້າເສຍຫາຍ' }), h('b', { text: U.kip(lossValue) + ' ກີບ' })])]) : null,
-
     h('h3', { class: 'sec', text: 'ກະລ່າສຸດ' }),
     recent.length
       ? card(recent, 'tasks')
@@ -418,7 +294,6 @@ SCREENS.report = async function (branchFilter) {
       btn('ສົ່ງອອກ ກະ + ເງິນສົດ', exportShifts, 'ghost', 'ກຳລັງສົ່ງອອກ…'),
       btn('ສົ່ງອອກ ອຸນຫະພູມ', exportTemps, 'ghost', 'ກຳລັງສົ່ງອອກ…'),
       btn('ສົ່ງອອກ ບັນຫາ', exportIssues, 'ghost', 'ກຳລັງສົ່ງອອກ…'),
-      btn('ສົ່ງອອກ ສິນຄ້າ', exportStock, 'ghost', 'ກຳລັງສົ່ງອອກ…'),
       btn('ສົ່ງອອກ ເບີ້ຍຂະຫຍັນ', exportBonus, 'ghost', 'ກຳລັງສົ່ງອອກ…'),
       btn('ດາວໂຫຼດຮູບທັງໝົດ', exportPhotos, 'ghost', 'ກຳລັງດາວໂຫຼດ…')
     ])
@@ -460,18 +335,6 @@ async function exportIssues() {
   issues.forEach(i => rows.push([i.date, i.branch, i.text, i.createdBy || '', i.owner || '',
                                  i.due || '', i.status, i.closedAt ? U.stamp(i.closedAt) : '']));
   U.downloadCsv(rows, `gomart_issues_${U.today()}.csv`);
-}
-
-async function exportStock() {
-  const rows0 = await DB.all('stock');
-  const rows = [['ປະເພດ', 'ວັນທີ', 'ສາຂາ', 'ພະນັກງານ', 'ຊື່ສິນຄ້າ', 'ບາໂຄດ', 'ຈໍານວນ', 'ຫົວໜ່ວຍ',
-                 'ຄົງເຫຼືອ', 'ROP', 'ຕ້ອງສັ່ງ', 'ວັນໝົດອາຍຸ', 'ເຫຼືອ(ມື້)', 'ລາຄາ/ຫົວໜ່ວຍ', 'ມູນຄ່າເສຍຫາຍ', 'ການຈັດການ']];
-  rows0.forEach(r => rows.push([
-    r.kind === 'nearout' ? 'ໃກ້ໝົດ' : 'ໝົດອາຍຸ/ເສຍຫາຍ', r.date, r.branch, r.staff, r.name,
-    r.barcode || '', r.qty ?? '', r.unit || '', r.kind === 'nearout' ? r.qty : '',
-    r.rop ?? '', r.order ?? '', r.expiry || '', r.daysLeft ?? '', r.price ?? '', r.value ?? '', r.actionLabel || r.status || ''
-  ]));
-  U.downloadCsv(rows, `gomart_stock_${U.today()}.csv`);
 }
 
 async function exportPhotos() {
@@ -828,7 +691,7 @@ async function purgeCancelled() {
 
 async function backup() {
   const out = {};
-  for (const s of ['settings', 'shifts', 'checks', 'temps', 'cash', 'issues', 'stock']) out[s] = await DB.all(s);
+  for (const s of ['settings', 'shifts', 'checks', 'temps', 'cash', 'issues', 'stock', 'bonusAdj']) out[s] = await DB.all(s);
   const photos = await DB.all('photos');
   out.photos = photos.map(p => ({ ...p, blob: undefined, size: p.blob ? p.blob.size : 0 }));
   U.download(new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }),

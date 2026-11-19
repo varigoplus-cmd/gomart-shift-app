@@ -122,7 +122,7 @@ function header(title, sub, ring) {
 
 const NAV = [
   { key: 'home',   label: 'ໜ້າຫຼັກ',  icon: '⌂' },
-  { key: 'stock',  label: 'ສິນຄ້າ',   icon: '▤' },
+  { key: 'zone',   label: 'ກວດໂຊນ',  icon: '▤' },
   { key: 'issues', label: 'ບັນຫາ',    icon: '!'  },
   { key: 'report', label: 'ລາຍງານ',   icon: '▦' },
   { key: 'config', label: 'ຕັ້ງຄ່າ',  icon: '⚙' }
@@ -1003,7 +1003,14 @@ SCREENS.cash = async function () {
 
 /* ---------- ກວດນັບໂຊນ ---------- */
 SCREENS.zone = async function () {
-  const sh = S.shift; if (!sh) return go('home');
+  const sh = S.shift;
+  /* ບໍ່ມີກະເປີດຢູ່ — ບອກເຫດຜົນ ແລະ ມີທາງໄປຕໍ່ ດີກວ່າເດັ້ງກັບໂດຍບໍ່ບອກຫຍັງ */
+  if (!sh) return render('ກວດນັບໂຊນສິນຄ້າ', 'ຍັງບໍ່ໄດ້ເຊັກອິນ', [
+    card([
+      h('div', { class: 'note', text: 'ຕ້ອງເຊັກອິນເຂົ້າກະກ່ອນ ຈຶ່ງຈະກວດນັບໂຊນໄດ້' }),
+      btn('ໄປເຊັກອິນ', () => go('home'), 'primary')
+    ])
+  ]);
   const done = (await DB.by('checks', 'shiftId', sh.id)).filter(c => c.form === 'zone');
   const doneZones = [...new Set(done.map(c => c.zone))];
   let zone = S.settings.zones.find(z => !doneZones.includes(z)) || S.settings.zones[0];
