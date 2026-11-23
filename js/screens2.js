@@ -622,9 +622,8 @@ SCREENS.config = async function () {
                    p.shiftKey || '', e => { st.staff[i].shiftKey = e.target.value || null; save(); })),
             rowLabel('ປະເພດ', select([{ value: 'full', label: 'ປະຈໍາ' }, { value: 'weekend', label: 'ພາດທາມ' }],
                    p.type || 'full', e => { st.staff[i].type = e.target.value; save(); }))
-          ])
-        ]),
-        /* ລະຫັດພະນັກງານ — ຜູ້ຈັດການຕັ້ງໃໝ່ ຫຼື ລຶບໄດ້ທຸກເວລາ */
+          ]),
+          /* ລະຫັດພະນັກງານ — ຜູ້ຈັດການຕັ້ງໃໝ່ ຫຼື ລຶບໄດ້ທຸກເວລາ */
         S.manager
           ? h('div', { class: 'addrow' }, [
               input({ id: 'pin_' + i, type: 'password', inputmode: 'numeric', autocomplete: 'off',
@@ -640,7 +639,8 @@ SCREENS.config = async function () {
                 delete st.staff[i].pinHash; await save(); U.toast('ລຶບລະຫັດແລ້ວ'); redraw();
               }, 'ghost sm')] : [])
             ])
-          : h('div', { class: 'muted', text: p.pinHash ? 'ມີລະຫັດແລ້ວ' : 'ຍັງບໍ່ມີລະຫັດ — ໃຫ້ຜູ້ຈັດການຕັ້ງ' }),
+          : h('div', { class: 'muted', text: p.pinHash ? 'ມີລະຫັດແລ້ວ' : 'ຍັງບໍ່ມີລະຫັດ — ໃຫ້ຜູ້ຈັດການຕັ້ງ' })
+        ]),
         h('button', { class: 'x', text: '✕', onclick: async () => {
           st.staff = st.staff.filter((_, j) => j !== i); await save(); redraw();
         } })
