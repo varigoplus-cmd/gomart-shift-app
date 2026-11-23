@@ -3,14 +3,14 @@
  * ທີ່ມາ: ຟອມເຈ້ຍ 6 ໃບ (v2) ຂອງ GO+MART
  */
 const CONFIG = {
-  version: '1.9.0',
+  version: '1.9.1',
 
   /* ຄ່າຕັ້ງຕົ້ນ — ປ່ຽນໄດ້ໃນໜ້າ "ຕັ້ງຄ່າ" ຂອງແອັບ */
   defaults: {
     branches: ['ສາຂາ 1'],
     shifts: [
       { key: 'morning', label: 'ກະເຊົ້າ', start: '06:30', end: '15:00' },
-      { key: 'afternoon', label: 'ກະແລງ', start: '14:30', end: '22:00' }
+      { key: 'afternoon', label: 'ກະແລງ', start: '14:00', end: '22:00' }
     ],
     /* ປະຈໍາ 4 ຄົນ (ເຊົ້າ KI, PHET · ແລງ GOD, ALEX) + ພາດທາມ 2 ຄົນ (ເຊົ້າ MOUK · ແລງ ERD)
      * ແກ້ໄດ້ໃນໜ້າ "ຕັ້ງຄ່າ" → ພະນັກງານ

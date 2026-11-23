@@ -26,6 +26,11 @@ function normStaff(raw) {
 
 async function loadSettings() {
   const d = CONFIG.defaults;
+  /* ເວລາກະຕັ້ງຄ່າໃໝ່ຄັ້ງດຽວ (ກະແລງເລີ່ມ 14:00) ແລ້ວຈຶ່ງໃຊ້ຄ່າທີ່ແກ້ໄດ້ */
+  if (!(await DB.setting('shiftsSeedV3'))) {
+    await DB.setting('shifts', null);
+    await DB.setting('shiftsSeedV3', true);
+  }
   /* ລາຍຊື່ຊຸດນີ້ຕັ້ງຄ່າໃໝ່ຄັ້ງດຽວ (ແທນຊື່ສົມມຸດເກົ່າ) ຫຼັງຈາກນັ້ນແກ້ໄດ້ປົກກະຕິ */
   let rawStaff = await DB.setting('staff');
   if (!(await DB.setting('staffSeedV2'))) {
@@ -36,7 +41,8 @@ async function loadSettings() {
     branches: await DB.setting('branches') || d.branches.slice(),
     staff: normStaff(rawStaff),
     zones: await DB.setting('zones') || CONFIG.zones.slice(),
-    shifts: await DB.setting('shifts') || d.shifts.map(x => ({ ...x })),
+    shifts: await DB.setting('shiftsSeedV3') ? (await DB.setting('shifts') || d.shifts.map(x => ({ ...x })))
+      : d.shifts.map(x => ({ ...x })),
     cashVarianceLimit: await DB.setting('cashVarianceLimit') ?? d.cashVarianceLimit,
     lateMinutes: await DB.setting('lateMinutes') ?? d.lateMinutes,
     earlyMinutes: await DB.setting('earlyMinutes') ?? d.earlyMinutes,
