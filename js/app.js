@@ -36,6 +36,45 @@ function normStaff(raw) {
     : { shiftKey: null, type: 'full', ...x });
 }
 
+/* ດຶງລາຍຊື່ຈາກເຊີບເວີມາລວມກັບລາຍຊື່ຢູ່ເຄື່ອງ — ຕໍ່ບໍ່ໄດ້ກໍໃຊ້ຂໍ້ມູນເກົ່າທີ່ເກັບໄວ້ */
+async function refreshStaffFromServer() {
+  const key = await DB.setting('storeKey');
+  if (!key) return;
+  let list;
+  try { list = await API.staff(key); } catch (e) { return; }
+  const byName = new Map(list.map(s => [s.name, s]));
+  S.settings.staff = S.settings.staff.map(p => {
+    const s = byName.get(p.name);
+    return { ...p, serverId: s ? s.id : null, hasPin: s ? !!s.has_pin : false };
+  });
+  for (const s of list) {
+    if (!S.settings.staff.some(p => p.name === s.name))
+      S.settings.staff.push({ name: s.name, shiftKey: s.shift_key,
+        type: s.employment === 'weekend' ? 'weekend' : 'full',
+        serverId: s.id, hasPin: !!s.has_pin });
+  }
+}
+/* ກວດລະຫັດຢູ່ເຊີບເວີ — ຜ່ານຄືນ true, ບໍ່ຜ່ານແຈ້ງເຫດຜົນແລ້ວຄືນ false */
+async function verifyPinOnServer(p, pin) {
+  const key = await DB.setting('storeKey');
+  if (!key) { U.toast('ຍັງບໍ່ໄດ້ໃສ່ລະຫັດເຄື່ອງຮ້ານ — ໄປທີ່ ຕັ້ງຄ່າ › ເຊື່ອມເຊີບເວີ', 'err'); return false; }
+  let r;
+  try { r = await API.checkIn(key, p.serverId, pin); }
+  catch (e) { U.toast('ຕໍ່ເຊີບເວີບໍ່ໄດ້ — ກວດອິນເຕີເນັດແລ້ວລອງໃໝ່', 'err'); return false; }
+  if (r.ok) return true;
+  const mins = r.until ? Math.max(1, Math.ceil((r.until - Date.now()) / 60000)) : 15;
+  const msg = {
+    wrong: 'ລະຫັດບໍ່ຖືກ · ເຫຼືອອີກ ' + r.left + ' ຄັ້ງກ່ອນຖືກລັອກ',
+    locked: 'ໃສ່ລະຫັດຜິດຫຼາຍເກີນ — ລໍຖ້າ ' + mins + ' ນາທີແລ້ວລອງໃໝ່',
+    nopin: 'ຄົນນີ້ຍັງບໍ່ມີລະຫັດ — ໃຫ້ຜູ້ຈັດການຕັ້ງກ່ອນ',
+    notfound: 'ຊື່ນີ້ບໍ່ຢູ່ໃນເຊີບເວີ — ໃຫ້ຜູ້ຈັດການກວດລາຍຊື່',
+    format: 'ລະຫັດຕ້ອງເປັນຕົວເລກ 4 ຕົວ',
+    denied: 'ລະຫັດເຄື່ອງຮ້ານບໍ່ຖືກ — ແກ້ໃນ ຕັ້ງຄ່າ › ເຊື່ອມເຊີບເວີ'
+  }[r.reason] || 'ເຊັກອິນບໍ່ສຳເລັດ ລອງໃໝ່';
+  U.toast(msg, 'err');
+  return false;
+}
+
 async function loadSettings() {
   const d = CONFIG.defaults;
   /* ເວລາກະຕັ້ງຄ່າໃໝ່ຄັ້ງດຽວ (ກະແລງເລີ່ມ 14:00) ແລ້ວຈຶ່ງໃຊ້ຄ່າທີ່ແກ້ໄດ້ */
@@ -64,6 +103,7 @@ async function loadSettings() {
     bonusFullWeekend: await DB.setting('bonusFullWeekend') ?? d.bonusFullWeekend,
     bonusAmounts: await DB.setting('bonusAmounts') || {}
   };
+  await refreshStaffFromServer();
   /* ຂຽນຮູບແບບໃໝ່ກັບລົງເຄື່ອງ ເພື່ອໃຫ້ໜ້າຕັ້ງຄ່າແກ້ໄດ້ເລີຍ */
   if (JSON.stringify(rawStaff) !== JSON.stringify(S.settings.staff))
     await DB.setting('staff', S.settings.staff);
@@ -396,7 +436,7 @@ const SCREENS = {};
 SCREENS.addhelper = async function () {
   const sh = S.shift; if (!sh) return go('home');
   const taken = [sh.staff, ...(sh.helpers || [])];
-  const options = S.settings.staff.filter(p => !taken.includes(p.name) && p.pinHash);
+  const options = S.settings.staff.filter(p => !taken.includes(p.name) && p.serverId && p.hasPin);
   let who = '', pinV = '';
   const body = card([
     h('h2', { class: 'ttl', text: 'ເພີ່ມຄົນຮ່ວມກະ' }),
@@ -408,8 +448,7 @@ SCREENS.addhelper = async function () {
     options.length ? btn('ເພີ່ມເຂົ້າກະ', async () => {
       const p = options.find(x => x.name === who);
       if (!p) return U.toast('ເລືອກຊື່ກ່ອນ', 'err');
-      const [salt, hash] = p.pinHash.split(':');
-      if ((await MGR.hash(pinV.trim(), salt)) !== hash) return U.toast('ລະຫັດບໍ່ຖືກ', 'err');
+      if (!(await verifyPinOnServer(p, pinV.trim()))) return;
       sh.helpers = [...(sh.helpers || []), who];
       await DB.put('shifts', sh);
       U.toast(who + ' ເຂົ້າກະແລ້ວ');
@@ -605,10 +644,9 @@ function screenStartShift() {
       const d = def();
       const lateBy = U.minutesLate(d.start);
       const p = people.find(x => x.name === nm);
-      /* ຕ້ອງມີລະຫັດຂອງຄົນນັ້ນ — ກັນການເຊັກອິນແທນຄົນອື່ນ */
-      if (!p || !p.pinHash) return U.toast('ຄົນນີ້ຍັງບໍ່ມີລະຫັດ ໃຫ້ຜູ້ຈັດການຕັ້ງກ່ອນ', 'err');
-      const [salt, hash] = p.pinHash.split(':');
-      if ((await MGR.hash(pinEntered.trim(), salt)) !== hash) return U.toast('ລະຫັດບໍ່ຖືກ', 'err');
+      /* ຕ້ອງຜ່ານລະຫັດຂອງຄົນນັ້ນຢູ່ເຊີບເວີ — ກັນການເຊັກອິນແທນຄົນອື່ນ ທຸກເຄື່ອງໃຊ້ຊຸດດຽວກັນ */
+      if (!p || !p.serverId) return U.toast('ຊື່ນີ້ຍັງບໍ່ຢູ່ໃນເຊີບເວີ — ໃຫ້ຜູ້ຈັດການກວດລາຍຊື່', 'err');
+      if (!(await verifyPinOnServer(p, pinEntered.trim()))) return;
       const shift = {
         id: DB.uid(), branch, shiftKey, staff: nm,
         staffType: p ? p.type : 'full',

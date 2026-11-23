@@ -1,12 +1,12 @@
 /* Service worker — ເຮັດໃຫ້ແອັບເປີດໄດ້ເຖິງບໍ່ມີເນັດ */
-const CACHE = 'gomart-shift-1.9.9';
-const V = '1.9.9';   /* ຕ້ອງຕົງກັບ ?v= ໃນ index.html */
+const CACHE = 'gomart-shift-1.10.0';
+const V = '1.10.0';   /* ຕ້ອງຕົງກັບ ?v= ໃນ index.html */
 const ASSETS = [
   './index.html', './manifest.json',
   './img/logo-64.png', './img/logo-96.png', './img/logo-180.png',
   './img/logo-192.png', './img/logo-512.png',
   './css/style.css?v=' + V,
-  './js/config.js?v=' + V, './js/db.js?v=' + V, './js/util.js?v=' + V, './js/sheetsync.js?v=' + V,
+  './js/config.js?v=' + V, './js/db.js?v=' + V, './js/util.js?v=' + V, './js/sheetsync.js?v=' + V, './js/api.js?v=' + V,
   './js/app.js?v=' + V, './js/bonus.js?v=' + V, './js/screens2.js?v=' + V
 ];
 self.addEventListener('install', e => {

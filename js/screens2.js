@@ -623,23 +623,31 @@ SCREENS.config = async function () {
             rowLabel('ປະເພດ', select([{ value: 'full', label: 'ປະຈໍາ' }, { value: 'weekend', label: 'ພາດທາມ' }],
                    p.type || 'full', e => { st.staff[i].type = e.target.value; save(); }))
           ]),
-          /* ລະຫັດພະນັກງານ — ຜູ້ຈັດການຕັ້ງໃໝ່ ຫຼື ລຶບໄດ້ທຸກເວລາ */
-        S.manager
+          /* ລະຫັດພະນັກງານ — ເກັບຢູ່ເຊີບເວີ ທຸກເຄື່ອງໃຊ້ຊຸດດຽວກັນ ຜູ້ຈັດການຕັ້ງ ຫຼື ລຶບໄດ້ */
+        !p.serverId
+          ? h('div', { class: 'muted', text: 'ຊື່ນີ້ບໍ່ຢູ່ໃນເຊີບເວີ — ກວດສະກົດຊື່ ຫຼື ແຈ້ງຜູ້ດູແລລະບົບໃຫ້ເພີ່ມ' })
+          : S.manager
           ? h('div', { class: 'addrow' }, [
               input({ id: 'pin_' + i, type: 'password', inputmode: 'numeric', autocomplete: 'off',
-                placeholder: p.pinHash ? 'ລະຫັດໃໝ່ 4 ຕົວ' : 'ລະຫັດ 4 ຕົວ' }),
+                placeholder: p.hasPin ? 'ລະຫັດໃໝ່ 4 ຕົວ' : 'ລະຫັດ 4 ຕົວ' }),
               btn('ບັນທຶກ', async () => {
                 const pin = (document.getElementById('pin_' + i).value || '').trim();
-                if (pin.length < 4) return U.toast('ລະຫັດຕ້ອງ 4 ຕົວຂຶ້ນໄປ', 'err');
-                const salt = [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
-                st.staff[i].pinHash = salt + ':' + (await MGR.hash(pin, salt));
-                await save(); U.toast('ບັນທຶກລະຫັດແລ້ວ'); redraw();
+                if (!/^[0-9]{4}$/.test(pin)) return U.toast('ລະຫັດຕ້ອງເປັນຕົວເລກ 4 ຕົວ', 'err');
+                const mk = await DB.setting('managerKey');
+                if (!mk) return U.toast('ຍັງບໍ່ໄດ້ໃສ່ລະຫັດຜູ້ຈັດການ — ໄປທີ່ ເຊື່ອມເຊີບເວີ', 'err');
+                const r = await API.setPin(mk, p.serverId, pin);
+                if (!r.ok) return U.toast(r.reason === 'denied' ? 'ລະຫັດຜູ້ຈັດການບໍ່ຖືກ' : 'ບັນທຶກບໍ່ສຳເລັດ ລອງໃໝ່', 'err');
+                st.staff[i].hasPin = true; await save(); U.toast('ບັນທຶກລະຫັດແລ້ວ'); redraw();
               }, 'sm'),
-              ...(p.pinHash ? [btn('ລຶບ', async () => {
-                delete st.staff[i].pinHash; await save(); U.toast('ລຶບລະຫັດແລ້ວ'); redraw();
+              ...(p.hasPin ? [btn('ລຶບ', async () => {
+                const mk = await DB.setting('managerKey');
+                if (!mk) return U.toast('ຍັງບໍ່ໄດ້ໃສ່ລະຫັດຜູ້ຈັດການ — ໄປທີ່ ເຊື່ອມເຊີບເວີ', 'err');
+                const r = await API.clearPin(mk, p.serverId);
+                if (!r.ok) return U.toast(r.reason === 'denied' ? 'ລະຫັດຜູ້ຈັດການບໍ່ຖືກ' : 'ລຶບບໍ່ສຳເລັດ ລອງໃໝ່', 'err');
+                st.staff[i].hasPin = false; await save(); U.toast('ລຶບລະຫັດແລ້ວ'); redraw();
               }, 'ghost sm')] : [])
             ])
-          : h('div', { class: 'muted', text: p.pinHash ? 'ມີລະຫັດແລ້ວ' : 'ຍັງບໍ່ມີລະຫັດ — ໃຫ້ຜູ້ຈັດການຕັ້ງ' })
+          : h('div', { class: 'muted', text: p.hasPin ? 'ມີລະຫັດແລ້ວ' : 'ຍັງບໍ່ມີລະຫັດ — ໃຫ້ຜູ້ຈັດການຕັ້ງ' })
         ]),
         h('button', { class: 'x', text: '✕', onclick: async () => {
           st.staff = st.staff.filter((_, j) => j !== i); await save(); redraw();
@@ -716,6 +724,32 @@ SCREENS.config = async function () {
       : h('div', { class: 'note', text: 'ຍັງບໍ່ມີກະທີ່ເປີດຢູ່' })
   ], 'danger-zone');
 
+  /* ເຊື່ອມເຊີບເວີ — ລາຍຊື່ ແລະ ລະຫັດພະນັກງານເກັບຢູ່ເຊີບເວີ ທຸກເຄື່ອງໃຊ້ຊຸດດຽວກັນ */
+  const storeKeyNow = (await DB.setting('storeKey')) || '';
+  const mgrKeyNow = (await DB.setting('managerKey')) || '';
+  const apiCard = card([
+    h('h3', { class: 'ttl', text: 'ເຊື່ອມເຊີບເວີ (ລາຍຊື່ ແລະ ລະຫັດ)' }),
+    h('div', { class: 'muted', text: 'ໃສ່ເທື່ອດຽວຕໍ່ເຄື່ອງ — ລະຫັດນີ້ເກັບໄວ້ໃນເຄື່ອງ ບໍ່ສົ່ງໄປແຜ່ນ' }),
+    rowLabel('ລະຫັດເຄື່ອງຮ້ານ (STORE_KEY)', input({ type: 'password', value: storeKeyNow, autocomplete: 'off',
+      onchange: e => DB.setting('storeKey', e.target.value.trim()) })),
+    rowLabel('ລະຫັດຜູ້ຈັດການ (MANAGER_KEY) — ໃສ່ສະເພາະເຄື່ອງຜູ້ຈັດການ', input({ type: 'password', value: mgrKeyNow, autocomplete: 'off',
+      onchange: e => DB.setting('managerKey', e.target.value.trim()) })),
+    h('div', { class: 'addrow' }, [
+      btn('ທົດສອບ ແລະ ດຶງລາຍຊື່', async () => {
+        const key = await DB.setting('storeKey');
+        if (!key) return U.toast('ໃສ່ລະຫັດເຄື່ອງຮ້ານກ່ອນ', 'err');
+        try {
+          const list = await API.staff(key);
+          await refreshStaffFromServer();
+          U.toast('ເຊື່ອມໄດ້ແລ້ວ · ພະນັກງານ ' + list.length + ' ຄົນ');
+          go('config');
+        } catch (e) {
+          U.toast(e.reason === 'denied' ? 'ລະຫັດເຄື່ອງຮ້ານບໍ່ຖືກ' : 'ເຊື່ອມບໍ່ໄດ້ — ກວດອິນເຕີເນັດ', 'err');
+        }
+      }, 'ghost')
+    ])
+  ]);
+
   /* ເຊື່ອມ Google Sheets — ຕັ້ງ URL ແລະ ລະຫັດຢູ່ເຄື່ອງນີ້ເທົ່ານັ້ນ */
   const sheetCard = card([
     h('h3', { class: 'ttl', text: 'ເຊື່ອມ Google Sheets' }),
@@ -759,6 +793,7 @@ SCREENS.config = async function () {
     ]),
     mgrCard,
     bonusCard,
+    apiCard,
     sheetCard,
     cancelCard,
     card([
