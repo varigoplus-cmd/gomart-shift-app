@@ -1,6 +1,18 @@
 /* GO+MART Shift System — ແອັບຫຼັກ */
 const h = U.el;
 
+/* ທຸກບັນທຶກກະ ຕິດຊື່ຜູ້ເຮັດ (by) ໄວ້ — ຜູ້ເຮັດຕອນນີ້ = S.actor ຫຼື ຜູ້ເຊັກອິນກະ */
+const _SHIFT_STORES = ['checks', 'temps', 'photos', 'cash', 'issues'];
+const _dbPut = DB.put, _dbPutMany = DB.putMany;
+function stampBy(store, obj) {
+  if (obj && obj.shiftId && _SHIFT_STORES.includes(store) && !obj.by) {
+    obj.by = S.actor || (S.shift && S.shift.staff) || '';
+  }
+  return obj;
+}
+DB.put = (store, obj) => _dbPut(store, stampBy(store, obj));
+DB.putMany = (store, arr) => _dbPutMany(store, arr.map(o => stampBy(store, o)));
+
 /* ສົ່ງເຫດການໄປແຜ່ນ — ລະຫັດແຖວຄົງທີ່ ສົ່ງຊໍ້າຈະບໍ່ເພີ່ມແຖວຊ້ໍາ */
 function syncEvt(sh, id, f) {
   SHEETSYNC.queue({ row: SHEETSYNC.row(id, {
@@ -380,6 +392,34 @@ function taskRow(label, done, onclick, extra, opt = {}) {
 const SCREENS = {};
 
 /* ---------- ໜ້າຫຼັກ ---------- */
+/* ເພີ່ມຄົນຮ່ວມກະ — ຕ້ອງໃສ່ລະຫັດຂອງຄົນນັ້ນ */
+SCREENS.addhelper = async function () {
+  const sh = S.shift; if (!sh) return go('home');
+  const taken = [sh.staff, ...(sh.helpers || [])];
+  const options = S.settings.staff.filter(p => !taken.includes(p.name) && p.pinHash);
+  let who = '', pinV = '';
+  const body = card([
+    h('h2', { class: 'ttl', text: 'ເພີ່ມຄົນຮ່ວມກະ' }),
+    options.length ? null : h('div', { class: 'note', text: 'ບໍ່ມີຄົນທີ່ພ້ອມເຂົ້າຮ່ວມ (ຕ້ອງມີລະຫັດກ່ອນ)' }),
+    options.length ? rowLabel('ຊື່', select([{ value: '', label: '— ເລືອກ —' },
+      ...options.map(p => ({ value: p.name, label: p.name }))], '', e => who = e.target.value)) : null,
+    options.length ? rowLabel('ລະຫັດຂອງຊື່ນັ້ນ', input({ type: 'password', inputmode: 'numeric', autocomplete: 'off',
+      placeholder: '4 ຕົວ', oninput: e => pinV = e.target.value })) : null,
+    options.length ? btn('ເພີ່ມເຂົ້າກະ', async () => {
+      const p = options.find(x => x.name === who);
+      if (!p) return U.toast('ເລືອກຊື່ກ່ອນ', 'err');
+      const [salt, hash] = p.pinHash.split(':');
+      if ((await MGR.hash(pinV.trim(), salt)) !== hash) return U.toast('ລະຫັດບໍ່ຖືກ', 'err');
+      sh.helpers = [...(sh.helpers || []), who];
+      await DB.put('shifts', sh);
+      U.toast(who + ' ເຂົ້າກະແລ້ວ');
+      go('home');
+    }, 'primary') : null,
+    btn('ກັບ', () => go('home'), 'ghost')
+  ]);
+  render('ເພີ່ມຄົນຮ່ວມກະ', sh.branch, [body]);
+};
+
 SCREENS.home = async function () {
   await loadOpenShift();
   if (!S.shift) return screenStartShift();
@@ -491,8 +531,17 @@ SCREENS.home = async function () {
     btn('ປິດກະ', closeShift, 'primary big-btn')
   ]) : null;
 
+  const people = [sh.staff, ...(sh.helpers || [])];
+  if (!S.actor || !people.includes(S.actor)) S.actor = sh.staff;
+  const actorCard = card([
+    rowLabel('ຜູ້ເຮັດງານຕອນນີ້', select(people.map(x => ({ value: x, label: x })), S.actor,
+      e => { S.actor = e.target.value; })),
+    btn('+ ເພີ່ມຄົນຮ່ວມກະ', () => go('addhelper'), 'ghost')
+  ]);
+
   const body = [
     hero,
+    actorCard,
     sh.lateBy > 0
       ? card([h('div', { class: 'warn', text: `⚠ ເປີດກະຊ້າ ${sh.lateBy} ນາທີ (ກະເລີ່ມ ${def.start})` })])
       : null,

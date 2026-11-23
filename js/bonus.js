@@ -100,8 +100,9 @@ const BONUS = (() => {
 
     /* ລວບລວມເຫດການທັງໝົດເປັນແຖວດຽວກັນກ່ອນ ແລ້ວຄ່ອຍແຍກຕາມຄົນ */
     const events = [];   /* {name, key, text, shiftId, date} */
-    const add = (sh, key, text) => events.push({
-      name: sh.staff, key, text, shiftId: sh.id, date: sh.date
+    /* byName = ຜູ້ທີ່ເຮັດງານນັ້ນ (ຖ້າບໍ່ມີ ໃຊ້ຜູ້ເຊັກອິນກະ) */
+    const add = (sh, key, text, byName) => events.push({
+      name: byName || sh.staff, key, text, shiftId: sh.id, date: sh.date
     });
 
     inMonth.forEach(sh => {
@@ -112,24 +113,24 @@ const BONUS = (() => {
 
     cash.forEach(c => {
       const sh = mine(c.shiftId); if (!sh) return;
-      if (Math.abs(c.variance) > limit) add(sh, 'cashVar', 'ສ່ວນຕ່າງ ' + U.kip(c.variance) + ' ກີບ');
+      if (Math.abs(c.variance) > limit) add(sh, 'cashVar', 'ສ່ວນຕ່າງ ' + U.kip(c.variance) + ' ກີບ', c.by);
     });
 
     temps.forEach(t => {
       const sh = mine(t.shiftId); if (!sh) return;
       if (t.min !== null && t.celsius !== null && (t.celsius < t.min || t.celsius > t.max))
-        add(sh, 'tempOut', t.label + ' ' + t.celsius + '°C');
+        add(sh, 'tempOut', t.label + ' ' + t.celsius + '°C', t.by);
     });
 
     photos.forEach(p => {
       const sh = mine(p.shiftId); if (!sh) return;
-      if (p.source && p.source !== 'camera') add(sh, 'photoFb', p.label || p.checkpoint);
+      if (p.source && p.source !== 'camera') add(sh, 'photoFb', p.label || p.checkpoint, p.by);
     });
 
     checks.forEach(c => {
       const sh = mine(c.shiftId); if (!sh) return;
       if (c.form === 'checklist' && c.ok === false && selfKeys.has(c.itemKey))
-        add(sh, 'selfCheck', c.label || c.itemKey);
+        add(sh, 'selfCheck', c.label || c.itemKey, c.by);
     });
 
     issues.forEach(i => {
