@@ -136,12 +136,30 @@ function header(title, sub, ring) {
   ]);
 }
 
+/* ໄອຄອນເສັ້ນບາງ (SVG ໃນຕົວ ບໍ່ຕ້ອງໂຫຼດຈາກເນັດ ໃຊ້ໄດ້ offline) */
+const ICON = {
+  home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
+  checklist: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 9l2 2 4-4M8 16h8"/>',
+  camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+  temp: '<path d="M10 14V5a2 2 0 0 1 4 0v9a4 4 0 1 1-4 0z"/>',
+  grid: '<rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/>',
+  alert: '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16v.5"/>',
+  chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>'
+};
+function iconEl(name, cls = 'ico') {
+  const el = document.createElement('span');
+  el.className = cls; el.setAttribute('aria-hidden', 'true');
+  el.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (ICON[name] || '') + '</svg>';
+  return el;
+}
+
 const NAV = [
-  { key: 'home',   label: 'ໜ້າຫຼັກ',  icon: '⌂' },
-  { key: 'zone',   label: 'ກວດໂຊນ',  icon: '▤' },
-  { key: 'issues', label: 'ບັນຫາ',    icon: '!'  },
-  { key: 'report', label: 'ລາຍງານ',   icon: '▦' },
-  { key: 'config', label: 'ຕັ້ງຄ່າ',  icon: '⚙' }
+  { key: 'home',    label: 'ໜ້າຫຼັກ', icon: 'home' },
+  { key: 'daily',   label: 'ເຊັກລິສຕ໌', icon: 'checklist' },
+  { key: 'issues',  label: 'ບັນຫາ', icon: 'alert' },
+  { key: 'report',  label: 'ລາຍງານ', icon: 'chart' },
+  { key: 'config',  label: 'ຕັ້ງຄ່າ', icon: 'settings' }
 ];
 
 function nav() {
@@ -149,7 +167,7 @@ function nav() {
     h('button', {
       class: 'nav-btn' + (S.route === n.key ? ' on' : ''),
       onclick: () => go(n.key)
-    }, [h('span', { class: 'nav-ico', text: n.icon }), h('span', { text: n.label })])
+    }, [iconEl(n.icon, 'nav-ico'), h('span', { text: n.label })])
   ));
 }
 
@@ -421,29 +439,39 @@ SCREENS.home = async function () {
     ]),
   ]);
 
+  const quick = [
+    { ic: 'checklist', t: 'ເຊັກລິສຕ໌', go: () => go('checklist') },
+    { ic: 'camera', t: 'ຖ່າຍຮູບ', go: () => go('photos', 'open') },
+    { ic: 'temp', t: 'ອຸນຫະພູມ', go: () => go('equipment', 1) },
+    { ic: 'grid', t: 'ກວດໂຊນ', go: () => go('zone') }
+  ];
+  const quickGrid = h('div', { class: 'quick' }, quick.map(q =>
+    h('button', { class: 'quick-t', 'data-ui': 'content', onclick: q.go }, [iconEl(q.ic), h('span', { text: q.t })])));
+
+  const taskCard = card([
+    ...['ເປີດກະ', 'ລະຫວ່າງກະ', 'ປິດກະ'].flatMap(ph => [
+      h('div', { class: 'phase-k', text: ph }),
+      ...TASKS.filter(t => t.phase === ph).map(t =>
+        taskRow(t.label, t.done, t.go, t.extra, { alert: t.alert, icon: t.icon })),
+      ...(ph === 'ລະຫວ່າງກະ' ? [taskRow('ແຈ້ງບັນຫາ', false, () => go('issueNew'), 'ເມື່ອພົບສິ່ງຜິດປົກກະຕິ', { icon: '!' })] : [])
+    ])
+  ], 'tasks');
+
+  const closeCard = closeReady ? card([
+    h('div', { class: 'next-k', text: 'ພ້ອມປິດກະ' }),
+    h('div', { class: 'next-t', text: 'ເຮັດຄົບທຸກລາຍການແລ້ວ' }),
+    btn('ປິດກະ', closeShift, 'primary big-btn')
+  ]) : null;
+
   const body = [
     hero,
-
     sh.lateBy > 0
-      ? card([h('div', { class: 'warn',
-          text: `⚠ ເປີດກະຊ້າ ${sh.lateBy} ນາທີ (ກະເລີ່ມ ${def.start})` })])
+      ? card([h('div', { class: 'warn', text: `⚠ ເປີດກະຊ້າ ${sh.lateBy} ນາທີ (ກະເລີ່ມ ${def.start})` })])
       : null,
-
-    nextCard,
-
-    /* ງານທັງໝົດຢູ່ລິດດຽວ ແບ່ງດ້ວຍປ້າຍເລັກ — ບໍ່ແຍກເປັນສາມກ່ອງ */
-    card([
-      h('div', { class: 'phase-k', text: 'ເປີດກະ' }),
-      ...TASKS.filter(t => t.phase === 'ເປີດກະ').map(t =>
-        taskRow(t.label, t.done, t.go, t.extra, { alert: t.alert, icon: t.icon })),
-      h('div', { class: 'phase-k', text: 'ລະຫວ່າງກະ' }),
-      ...TASKS.filter(t => t.phase === 'ລະຫວ່າງກະ').map(t =>
-        taskRow(t.label, t.done, t.go, t.extra, { alert: t.alert, icon: t.icon })),
-      taskRow('ແຈ້ງບັນຫາ', false, () => go('issueNew'), 'ເມື່ອພົບສິ່ງຜິດປົກກະຕິ', { icon: '!' }),
-      h('div', { class: 'phase-k', text: 'ປິດກະ' }),
-      ...TASKS.filter(t => t.phase === 'ປິດກະ').map(t =>
-        taskRow(t.label, t.done, t.go, t.extra, { alert: t.alert, icon: t.icon }))
-    ], 'tasks')
+    closeCard,
+    quickGrid,
+    h('h3', { class: 'sec', text: 'ງານວັນນີ້' }),
+    taskCard
   ];
   render(sh.branch,
          `${def.label} · ${sh.staff} · ເຊັກອິນ ${U.stamp(sh.openedAt).slice(-5)}`, body,

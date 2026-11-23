@@ -641,3 +641,12 @@ select.in{appearance:none;background-image:
 .dly-sub{margin:0 0 8px 18px;padding:0;color:var(--muted);font-size:13px;line-height:1.6}
 .dly-btns{display:flex;gap:var(--s2)}
 .dly-btns .btn{flex:1}
+
+/* ໜ້າຫຼັກແບບໃໝ່ — ປຸ່ມລັດເປັນໄອຄອນ ແລະ ແທັບລຸ່ມເປັນໄອຄອນ */
+.ico{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;background:var(--surface-2);color:var(--brand-text);flex:0 0 40px}
+.ico svg,.nav-ico svg{width:22px;height:22px}
+.nav-ico{display:flex;align-items:center;justify-content:center;height:24px}
+.quick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 var(--s4)}
+.quick-t{display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--surface-1);border:0.5px solid var(--border);border-radius:12px;padding:12px 4px;color:var(--text-primary);font-size:12px;cursor:pointer;font-family:inherit}
+.quick-t .ico{width:40px;height:40px;background:var(--bg-neutral)}
+.quick-t:active{background:var(--surface-2)}
