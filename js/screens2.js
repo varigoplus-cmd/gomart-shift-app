@@ -29,14 +29,14 @@ SCREENS.shiftDetail = async function (shiftId) {
     h('h3', { class: 'sec', text: 'ເງິນສົດ' }),
     c ? card([
       line('A. ເງິນທອນຕັ້ງຕົ້ນ', U.kip(c.float)),
-      line('B. ຍອດຂາຍເງິນສົດ (POS)', U.kip(c.posCash)),
+      line('B. ຍອດຂາຍເງິນສົດ (ເຄື່ອງຂາຍ)', U.kip(c.posCash)),
       line('C. ຄວນມີ (A+B)', U.kip(c.expected)),
       line('D. ນັບໄດ້ຈິງ', U.kip(c.counted)),
       line('E. ສ່ວນຕ່າງ', U.kip(c.variance), 'big-v'),
       c.reason ? h('div', { class: 'muted', text: 'ສາເຫດ: ' + c.reason + ' ' + (c.reasonNote || '') }) : null,
       c.manager ? h('div', { class: 'muted', text: 'ຜູ້ຈັດການທີ່ຮັບແຈ້ງ: ' + c.manager }) : null,
       c.correctedBy ? h('div', { class: 'warn', text: `ແກ້ໄຂໂດຍ ${c.correctedBy} ເມື່ອ ${U.stamp(c.correctedAt)} · ສ່ວນຕ່າງເດີມ ${U.kip(c.previousVariance)} ກີບ` }) : null,
-      btn('ແກ້ໄຂຍອດ POS', () => correctCash(sh, c), 'ghost')
+      btn('ແກ້ໄຂຍອດເຄື່ອງຂາຍ', () => correctCash(sh, c), 'ghost')
     ]) : card([h('div', { class: 'note', text: 'ກະນີ້ບໍ່ມີຂໍ້ມູນເງິນສົດ' })]),
 
     h('h3', { class: 'sec', text: 'ສະຫຼຸບ' }),
@@ -68,7 +68,7 @@ SCREENS.shiftDetail = async function (shiftId) {
   render('ລາຍລະອຽດກະ', sh.date + ' · ' + def.label, body);
 };
 
-/* ແກ້ຍອດ POS ຫຼັງປິດກະ — ຕ້ອງບອກວ່າໃຜແກ້ ແລະ ເກັບຄ່າເດີມໄວ້ */
+/* ແກ້ຍອດເຄື່ອງຂາຍຫຼັງປິດກະ — ຕ້ອງບອກວ່າໃຜແກ້ ແລະ ເກັບຄ່າເດີມໄວ້ */
 async function correctCash(sh, c) {
   let posCash = c.posCash, who = '';
   const out = h('b', { text: U.kip(c.variance) });
@@ -80,8 +80,8 @@ async function correctCash(sh, c) {
   const sheet = await new Promise(resolve => {
     const wrap = h('div', { class: 'sheet-wrap' }, [
       h('div', { class: 'sheet' }, [
-        h('h3', { class: 'sheet-t', text: 'ແກ້ໄຂຍອດຂາຍເງິນສົດ (POS)' }),
-        h('p', { class: 'sheet-l', text: 'ໃຊ້ເມື່ອພິມຍອດຈາກ POS ຜິດ ເງິນສົດທີ່ນັບໄດ້ຈະບໍ່ປ່ຽນ' }),
+        h('h3', { class: 'sheet-t', text: 'ແກ້ໄຂຍອດຂາຍເງິນສົດ (ເຄື່ອງຂາຍ)' }),
+        h('p', { class: 'sheet-l', text: 'ໃຊ້ເມື່ອພິມຍອດຈາກເຄື່ອງຂາຍຜິດ ເງິນສົດທີ່ນັບໄດ້ຈະບໍ່ປ່ຽນ' }),
         rowLabel('B. ຍອດຂາຍເງິນສົດ (ກີບ)',
           input({ type: 'number', value: posCash, oninput: e => { posCash = e.target.value; recalc(); } })),
         h('div', { class: 'vrow big-v' }, [h('span', { text: 'ສ່ວນຕ່າງໃໝ່' }), out]),
@@ -109,7 +109,7 @@ async function correctCash(sh, c) {
   });
   await DB.put('issues', {
     shiftId: sh.id, branch: sh.branch, date: sh.date,
-    text: `ແກ້ໄຂຍອດ POS ຫຼັງປິດກະ: ສ່ວນຕ່າງ ${U.kip(c.variance)} → ${U.kip(v)} ກີບ`,
+    text: `ແກ້ໄຂຍອດເຄື່ອງຂາຍ ຫຼັງປິດກະ: ສ່ວນຕ່າງ ${U.kip(c.variance)} → ${U.kip(v)} ກີບ`,
     owner: who.trim(), due: '', status: 'ແກ້ແລ້ວ',
     createdAt: new Date().toISOString(), closedAt: new Date().toISOString(), createdBy: who.trim()
   });

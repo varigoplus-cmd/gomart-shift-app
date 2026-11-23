@@ -337,7 +337,7 @@ SCREENS.home = async function () {
 
   /* ງານບັງຄັບທັງໝົດ ເກັບໄວ້ບ່ອນດຽວ ໃຊ້ທັງນັບຄວາມຄືບໜ້າ ແລະ ວາດແຖວ */
   const TASKS = [
-    { icon: '☑', phase: 'ເປີດກະ', label: 'Checklist ໜ້າຮ້ານ', hint: 'ກວດຄວາມພ້ອມ 19 ລາຍການ',
+    { icon: '☑', phase: 'ເປີດກະ', label: 'ເຊັກລິສຕ໌ໜ້າຮ້ານ', hint: 'ກວດຄວາມພ້ອມ 19 ລາຍການ',
       done: p.checklist, go: () => go('checklist'),
       extra: p.checklist ? 'ບັນທຶກ ' + p.savedAt.checklist : '' },
     { icon: '°C', phase: 'ເປີດກະ', label: 'ກວດເຄື່ອງໃຊ້ ຮອບ 1', hint: 'ອ່ານອຸນຫະພູມຈາກໜ້າຈໍເຄື່ອງ',
@@ -360,7 +360,7 @@ SCREENS.home = async function () {
       extra: `${p.counts.closePhotos}/${p.counts.closeNeed} ຈຸດ` },
     { icon: '✓', phase: 'ປິດກະ', label: 'ເຊັກລິສຕ໌ປະຈໍາວັນ', hint: 'ກວດ ' + p.dailyNeed + ' ຂໍ້ກ່ອນປິດກະ',
       done: p.daily >= p.dailyNeed, go: () => go('daily'), extra: `${p.daily}/${p.dailyNeed} ຂໍ້` },
-    { icon: '₭', phase: 'ປິດກະ', label: 'ນັບເງິນ + ທຽບ POS', hint: 'ນັບໃບເງິນ ແລະ ອ່ານຍອດຈາກ POS',
+    { icon: '₭', phase: 'ປິດກະ', label: 'ນັບເງິນ + ທຽບເຄື່ອງຂາຍ', hint: 'ນັບໃບເງິນ ແລະ ອ່ານຍອດຈາກເຄື່ອງຂາຍ',
       done: !!p.cash, go: () => go('cash'), alert: cashBad,
       extra: p.cash
         ? `ນັບໄດ້ ${U.kip(p.cash.counted)} · ສ່ວນຕ່າງ ${U.kip(p.cash.variance)} ກີບ · ບັນທຶກ ${p.savedAt.cash}`
@@ -583,7 +583,7 @@ async function closeShift() {
   go('report');
 }
 
-/* ---------- Checklist ໜ້າຮ້ານ ---------- */
+/* ---------- ເຊັກລິສຕ໌ໜ້າຮ້ານ ---------- */
 SCREENS.checklist = async function () {
   const sh = S.shift; if (!sh) return go('home');
   const existing = (await DB.by('checks', 'shiftId', sh.id)).filter(c => c.form === 'checklist');
@@ -646,13 +646,13 @@ SCREENS.checklist = async function () {
       ok: state[i.key].ok, note: state[i.key].note, ts: new Date().toISOString()
     })));
     const bad = all.filter(i => state[i.key].ok === false);
-    if (bad.length) await autoIssues(bad.map(i => `Checklist: ${i.label} — ${state[i.key].note || 'ບໍ່ຜ່ານ'}`));
+    if (bad.length) await autoIssues(bad.map(i => `ເຊັກລິສຕ໌: ${i.label} — ${state[i.key].note || 'ບໍ່ຜ່ານ'}`));
     await clearDraft(sh, 'checklist');
     U.toast('ບັນທຶກແລ້ວ');
     go('home');
   }, 'primary big-btn')]));
 
-  render('Checklist ໜ້າຮ້ານ', sh.branch + ' · ' + allItems.length + ' ລາຍການ', blocks);
+  render('ເຊັກລິສຕ໌ໜ້າຮ້ານ', sh.branch + ' · ' + allItems.length + ' ລາຍການ', blocks);
   pbar.set(allItems.filter(i => answered(i.key)).length);
   if (draft && !existing.length) U.toast('ກູ້ຂໍ້ມູນທີ່ຕື່ມຄ້າງໄວ້ຄືນແລ້ວ');
 };
@@ -984,7 +984,7 @@ SCREENS.float = async function () {
   render('ເງິນທອນຕັ້ງຕົ້ນ', sh.branch, body);
 };
 
-/* ---------- ນັບເງິນ + ທຽບ POS ---------- */
+/* ---------- ນັບເງິນ + ທຽບເຄື່ອງຂາຍ ---------- */
 SCREENS.cash = async function () {
   const sh = S.shift; if (!sh) return go('home');
   const prev = (await DB.by('cash', 'shiftId', sh.id))[0] || null;
@@ -1069,7 +1069,7 @@ SCREENS.cash = async function () {
   const body = [
     card([h('h3', { class: 'ttl', text: 'ສ່ວນທີ 1 · ນັບໃບເງິນ' }), ...denomRows]),
     card([
-      h('h3', { class: 'ttl', text: 'ສ່ວນທີ 2 · ອ່ານຈາກ POS' }),
+      h('h3', { class: 'ttl', text: 'ສ່ວນທີ 2 · ອ່ານຈາກເຄື່ອງຂາຍ' }),
       rowLabel('A. ເງິນທອນຕັ້ງຕົ້ນ (ກີບ)', input({ value: U.kip(sh.float), disabled: 'disabled' })),
       rowLabel('B. ຍອດຂາຍດ້ວຍເງິນສົດ (ກີບ)',
         input({ type: 'number', inputmode: 'numeric', value: f.posCash, oninput: e => { f.posCash = e.target.value; recalc(); keep(); } })),
@@ -1086,7 +1086,7 @@ SCREENS.cash = async function () {
     reasonWrap,
     card([btn('ບັນທຶກ', async () => {
       const r = recalc();
-      if (f.posCash === '' ) return U.toast('ຕ້ອງໃສ່ຍອດຂາຍເງິນສົດຈາກ POS', 'err');
+      if (f.posCash === '' ) return U.toast('ຕ້ອງໃສ່ຍອດຂາຍເງິນສົດຈາກເຄື່ອງຂາຍ', 'err');
       if (r.over && (!f.reason || f.reason.startsWith('—')))
         return U.toast(`ສ່ວນຕ່າງເກີນ ${U.kip(S.settings.cashVarianceLimit)} ກີບ ຕ້ອງເລືອກສາເຫດ`, 'err');
       if (r.over && !f.manager.trim())
@@ -1111,7 +1111,7 @@ SCREENS.cash = async function () {
     h('div', { style: 'height:78px' }),   /* ເນື້ອທີ່ໃຫ້ແຖບສະຫຼຸບທີ່ລອຍຢູ່ລຸ່ມ */
     stickySum
   ];
-  render('ນັບເງິນ + ທຽບ POS', sh.branch, body);
+  render('ນັບເງິນ + ທຽບເຄື່ອງຂາຍ', sh.branch, body);
   paintDen(); recalc();
 };
 
