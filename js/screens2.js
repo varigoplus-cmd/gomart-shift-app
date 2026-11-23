@@ -624,6 +624,18 @@ SCREENS.config = async function () {
                    p.type || 'full', e => { st.staff[i].type = e.target.value; save(); }))
           ])
         ]),
+        /* ລະຫັດພະນັກງານ — ຜູ້ຈັດການເທົ່ານັ້ນຕັ້ງໄດ້ */
+        S.manager
+          ? rowLabel(p.pinHash ? 'ລະຫັດ (ຕັ້ງໃໝ່ເມື່ອຕ້ອງການ)' : 'ລະຫັດ (ຍັງບໍ່ໄດ້ຕັ້ງ)',
+              input({ type: 'password', inputmode: 'numeric', autocomplete: 'off', placeholder: '4 ຕົວ',
+                onchange: async e => {
+                  const pin = e.target.value.trim();
+                  if (pin.length < 4) return U.toast('ລະຫັດຕ້ອງ 4 ຕົວຂຶ້ນໄປ', 'err');
+                  const salt = [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
+                  st.staff[i].pinHash = salt + ':' + (await MGR.hash(pin, salt));
+                  await save(); U.toast('ຕັ້ງລະຫັດແລ້ວ'); redraw();
+                } }))
+          : h('div', { class: 'muted', text: p.pinHash ? 'ມີລະຫັດແລ້ວ' : 'ຍັງບໍ່ມີລະຫັດ — ໃຫ້ຜູ້ຈັດການຕັ້ງ' }),
         h('button', { class: 'x', text: '✕', onclick: async () => {
           st.staff = st.staff.filter((_, j) => j !== i); await save(); redraw();
         } })

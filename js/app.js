@@ -547,10 +547,15 @@ function screenStartShift() {
 
   refresh();
 
+  let pinEntered = '';
+  const pinIn = input({ type: 'password', inputmode: 'numeric', autocomplete: 'off',
+    placeholder: '4 ຕົວ', oninput: e => pinEntered = e.target.value });
+
   const body = card([
     h('h2', { class: 'ttl', text: 'ເຊັກອິນ ເຂົ້າວຽກ' }),
     rowLabel('ສາຂາ', select(st.branches, branch, e => branch = e.target.value)),
     rowLabel('ຊື່ພະນັກງານ', staffSel),
+    rowLabel('ລະຫັດຂອງຊື່ນັ້ນ', pinIn),
     rowLabel('ກະ', shiftSel),
     info,
     btn('ເຊັກອິນ', async () => {
@@ -559,6 +564,10 @@ function screenStartShift() {
       const d = def();
       const lateBy = U.minutesLate(d.start);
       const p = people.find(x => x.name === nm);
+      /* ຕ້ອງມີລະຫັດຂອງຄົນນັ້ນ — ກັນການເຊັກອິນແທນຄົນອື່ນ */
+      if (!p || !p.pinHash) return U.toast('ຄົນນີ້ຍັງບໍ່ມີລະຫັດ ໃຫ້ຜູ້ຈັດການຕັ້ງກ່ອນ', 'err');
+      const [salt, hash] = p.pinHash.split(':');
+      if ((await MGR.hash(pinEntered.trim(), salt)) !== hash) return U.toast('ລະຫັດບໍ່ຖືກ', 'err');
       const shift = {
         id: DB.uid(), branch, shiftKey, staff: nm,
         staffType: p ? p.type : 'full',
