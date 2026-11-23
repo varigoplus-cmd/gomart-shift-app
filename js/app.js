@@ -431,7 +431,7 @@ SCREENS.home = async function () {
 
   /* ງານບັງຄັບທັງໝົດ ເກັບໄວ້ບ່ອນດຽວ ໃຊ້ທັງນັບຄວາມຄືບໜ້າ ແລະ ວາດແຖວ */
   const TASKS = [
-    { icon: '☑', phase: 'ເປີດກະ', label: 'ເຊັກລິສຕ໌ໜ້າຮ້ານ', hint: 'ກວດຄວາມພ້ອມ 19 ລາຍການ',
+    { icon: '☑', phase: 'ເປີດກະ', label: 'ເຊັກລິສຕ໌ໜ້າຮ້ານ', hint: 'ກວດຄວາມພ້ອມ ' + CONFIG.checklist.reduce((n, sec) => n + sec.items.length, 0) + ' ລາຍການ',
       done: p.checklist, go: () => go('checklist'),
       extra: p.checklist ? 'ບັນທຶກ ' + p.savedAt.checklist : '' },
     { icon: '°C', phase: 'ເປີດກະ', label: 'ກວດເຄື່ອງໃຊ້ ຮອບ 1', hint: 'ອ່ານອຸນຫະພູມຈາກໜ້າຈໍເຄື່ອງ',
@@ -440,9 +440,6 @@ SCREENS.home = async function () {
     { icon: '◉', phase: 'ເປີດກະ', label: 'ຮູບເປີດກະ', hint: 'ຖ່າຍ ' + p.counts.openNeed + ' ຈຸດ',
       done: p.photosOpen, go: () => go('photos', 'open'),
       extra: `${p.counts.openPhotos}/${p.counts.openNeed} ຈຸດ` },
-    { icon: '₭', phase: 'ເປີດກະ', label: 'ເງິນທອນຕັ້ງຕົ້ນ', hint: 'ນັບເງິນທີ່ຮັບມາຕອນເລີ່ມກະ',
-      done: p.float, go: () => go('float'),
-      extra: p.float ? U.kip(sh.float) + ' ກີບ' : '' },
     { icon: '▤', phase: 'ລະຫວ່າງກະ', label: 'ກວດນັບໂຊນສິນຄ້າ', hint: 'ກວດ ' + p.zonesNeeded + ' ໂຊນຕໍ່ກະ',
       done: p.zones >= p.zonesNeeded, go: () => go('zone'),
       extra: `${p.zones}/${p.zonesNeeded} ໂຊນ` },

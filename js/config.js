@@ -3,7 +3,7 @@
  * ທີ່ມາ: ຟອມເຈ້ຍ 6 ໃບ (v2) ຂອງ GO+MART
  */
 const CONFIG = {
-  version: '1.9.7',
+  version: '1.9.8',
 
   /* ຄ່າຕັ້ງຕົ້ນ — ປ່ຽນໄດ້ໃນໜ້າ "ຕັ້ງຄ່າ" ຂອງແອັບ */
   defaults: {
@@ -75,7 +75,6 @@ const CONFIG = {
   checklist: [
     { section: '1. ການແຕ່ງກາຍ ແລະ ຄວາມສະອາດສ່ວນຕົວ', items: [
       { key: 'uniform',  label: 'ໃສ່ເຄື່ອງແບບພະນັກງານໜ້າຮ້ານ' },
-      { key: 'badge',    label: 'ຕິດປ້າຍພະນັກງານ' },
       { key: 'grooming', label: 'ຜົມ, ໜ້າ, ເລັບສະອາດ' },
       { key: 'shoes',    label: 'ເກີບສຸພາບ' }
     ]},
