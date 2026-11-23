@@ -51,6 +51,25 @@ const API = (() => {
       return r.status === 200 && r.data.ok ? { ok: true } : { ok: false, reason: r.status === 401 ? 'denied' : 'failed' };
     },
 
+    /* ອັບໂຫຼດຮູບຂຶ້ນ R2 — ຄືນລິ້ງຮູບ ຫຼື ໂຍນ error ເມື່ອບໍ່ສຳເລັດ */
+    async uploadPhoto(storeKey, blob) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 30000);
+      try {
+        const res = await fetch(BASE + '/api/photos', {
+          method: 'POST',
+          headers: { 'x-store-key': storeKey, 'content-type': 'image/jpeg' },
+          body: blob,
+          signal: ctrl.signal
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.url) throw new Error('upload ' + res.status);
+        return data.url;
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+
     /* ຜູ້ຈັດການລຶບລະຫັດ */
     async clearPin(managerKey, staffId) {
       const r = await call('/api/manager/clear-pin', {

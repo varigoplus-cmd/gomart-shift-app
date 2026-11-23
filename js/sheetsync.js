@@ -7,12 +7,13 @@ const SHEETSYNC = (() => {
 
   const COLS = ['ລະຫັດ','ວັນທີ','ເວລາ','ສາຂາ','ກະ','ຜູ້ບັນທຶກ','ປະເພດ','ໝວດ','ລາຍການ','ຈໍານວນ','ຫົວໜ່ວຍ','ເຫດຜົນ / ລາຍລະອຽດ','ຜູ້ອະນຸມັດ','ສະຖານະ','ອັບເດດລ່າສຸດ','ໝາຍເຫດ'];
 
-  function row(id, { date, time, branch, shift, staff, type, cat, item, qty, unit, note, status }) {
+  function row(id, { date, time, branch, shift, staff, type, cat, item, qty, unit, note, status, remark }) {
     const r = new Array(COLS.length).fill('');
     r[0] = id; r[1] = date; r[2] = time; r[3] = branch; r[4] = shift; r[5] = staff;
     r[6] = type; r[7] = cat; r[8] = item; r[9] = qty ?? ''; r[10] = unit ?? '';
     r[11] = note ?? ''; r[13] = status ?? 'ປິດແລ້ວ';
     r[14] = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    r[15] = remark ?? '';
     return r;
   }
 

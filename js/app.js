@@ -18,7 +18,29 @@ function syncEvt(sh, id, f) {
   SHEETSYNC.queue({ row: SHEETSYNC.row(id, {
     date: sh.date, time: U.nowTime(), branch: sh.branch, shift: shiftDef(sh.shiftKey).label,
     staff: sh.staff, type: f.type, cat: f.cat, item: f.item, qty: f.qty, unit: f.unit,
-    note: f.note, status: f.status || 'ບັນທຶກແລ້ວ' }) });
+    note: f.note, status: f.status || 'ບັນທຶກແລ້ວ', remark: f.remark }) });
+}
+/* ອັບໂຫຼດຮູບຂຶ້ນ R2 ແລ້ວສົ່ງແຖວພ້ອມຮູບໄປແຜ່ນ — ອັບບໍ່ສຳເລັດຈະບໍ່ສົ່ງແຖວ ລອງໃໝ່ຕອນເປີດໜ້າຫຼັກ */
+async function syncPhotoRow(sh, rec, pt, phase) {
+  if (!rec.url) {
+    const key = await DB.setting('storeKey');
+    if (!key) return;
+    try {
+      rec.url = await API.uploadPhoto(key, rec.blob);
+      await DB.put('photos', rec);
+    } catch (e) { return; }
+  }
+  syncEvt(sh, 'PHT-' + sh.id + '-' + phase + '-' + pt.key + '-' + rec.ts, {
+    type: 'ຖ່າຍຮູບ', cat: phase === 'open' ? 'ເປີດກະ' : 'ປິດກະ', item: pt.label, qty: 1, unit: 'ຮູບ',
+    note: rec.source === 'camera' ? 'ກ້ອງໃນແອັບ' : 'ທາງສໍາຮອງ ⚠ ບໍ່ໄດ້ຖ່າຍຜ່ານກ້ອງໃນແອັບ',
+    remark: '=IMAGE("' + rec.url + '")' });
+}
+/* ຮູບທີ່ອັບໂຫຼດບໍ່ສຳເລັດກ່ອນໜ້າ ລອງໃໝ່ */
+async function retryPhotoUploads(sh) {
+  const pending = (await DB.by('photos', 'shiftId', sh.id)).filter(p => !p.url);
+  for (const p of pending) {
+    await syncPhotoRow(sh, p, { key: p.checkpoint, label: p.label }, p.phase);
+  }
 }
 let S = {            /* ສະຖານະແອັບ */
   settings: null,
@@ -462,6 +484,7 @@ SCREENS.addhelper = async function () {
 SCREENS.home = async function () {
   await loadOpenShift();
   if (!S.shift) return screenStartShift();
+  retryPhotoUploads(S.shift).catch(() => {});
 
   const sh = S.shift;
   const def = shiftDef(sh.shiftKey);
@@ -1000,14 +1023,13 @@ SCREENS.photos = async function (phase) {
     ];
     const blob = await U.watermark(src, lines);
     if (existing) await DB.del('photos', existing.id);
-    await DB.put('photos', {
-      shiftId: sh.id, phase, checkpoint: pt.key, label: pt.label,
+    const rec = {
+      id: DB.uid(), shiftId: sh.id, phase, checkpoint: pt.key, label: pt.label,
       blob, gps: pos, source,              /* camera = ກ້ອງໃນແອັບ · fallback = ທາງສໍາຮອງ */
-      ts: new Date().toISOString(), staff: sh.staff, branch: sh.branch
-    });
-    syncEvt(sh, 'PHT-' + sh.id + '-' + phase + '-' + pt.key + '-' + Date.now(), { type: 'ຖ່າຍຮູບ',
-      cat: phase === 'open' ? 'ເປີດກະ' : 'ປິດກະ', item: pt.label, qty: 1, unit: 'ຮູບ',
-      note: source === 'camera' ? 'ກ້ອງໃນແອັບ' : 'ທາງສໍາຮອງ ⚠ ບໍ່ໄດ້ຖ່າຍຜ່ານກ້ອງໃນແອັບ' });
+      ts: new Date().toISOString(), staff: sh.staff, branch: sh.branch, url: null
+    };
+    await DB.put('photos', rec);
+    syncPhotoRow(sh, rec, pt, phase).catch(() => {});
     U.toast(source === 'camera' ? 'ບັນທຶກຮູບແລ້ວ' : 'ບັນທຶກແລ້ວ (ບໍ່ໄດ້ໃຊ້ກ້ອງໃນແອັບ)');
     go('photos', phase);
   }
