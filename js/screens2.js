@@ -364,8 +364,47 @@ async function monthChips(current, onPick) {
                   onclick: () => onPick(m) }, m)));
 }
 
+/* ---------- ໂໝດຜູ້ຈັດການ: ເຫັນຂອງທຸກຄົນ · ພະນັກງານເຫັນຂອງຕົນເອງ ---------- */
+const MGR = {
+  async hash(pin, salt) {
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256',
+      salt: new TextEncoder().encode(salt), iterations: 100000 }, key, 256);
+    return [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, '0')).join('');
+  },
+  async setPin(pin) {
+    const salt = [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
+    await DB.setting('mgrSalt', salt);
+    await DB.setting('mgrHash', await MGR.hash(pin, salt));
+  },
+  async check(pin) {
+    const salt = await DB.setting('mgrSalt'), stored = await DB.setting('mgrHash');
+    return !!salt && !!stored && (await MGR.hash(pin, salt)) === stored;
+  }
+};
+/* ເຫັນໄດ້ເຕັມ ເມື່ອເປັນຜູ້ຈັດການ ຫຼື ເປັນຊື່ຂອງຕົນເອງເທົ່ານັ້ນ */
+const canSeeBonusOf = name => !!S.manager || (!!S.shift && S.shift.staff === name);
+
 SCREENS.bonus = async function (ym) {
   ym = ym || BONUS.thisCycle();
+  if (!S.manager) {
+    const me = S.shift && S.shift.staff;
+    const span = BONUS.cycleRange(ym);
+    if (!me) {
+      return render('ເບີ້ຍຂະຫຍັນ', span.from + ' ຫາ ' + span.to, [
+        card([h('div', { class: 'note', text: 'ເຊັກອິນກ່ອນ ຈຶ່ງຈະເຫັນເບີ້ຍຂອງທ່ານ' })])
+      ]);
+    }
+    const mine = (await BONUS.cycle(ym)).find(r => r.name === me);
+    return render('ເບີ້ຍຂອງທ່ານ', span.from + ' ຫາ ' + span.to, [
+      card([
+        h('div', { class: 'vrow' }, [h('span', { text: 'ເບີ້ຍເຕັມ' }), h('b', { text: U.kip(mine ? mine.full : 0) + ' ກີບ' })]),
+        h('div', { class: 'vrow bad-line' }, [h('span', { text: 'ຫັກທັງໝົດ' }), h('b', { text: '-' + U.kip(mine ? mine.deducted : 0) })]),
+        h('div', { class: 'vrow big-v' }, [h('span', { text: 'ໄດ້ຈິງ' }), h('b', { text: U.kip(mine ? mine.paid : 0) + ' ກີບ' })])
+      ]),
+      btn('ເບິ່ງວ່າຖືກຫັກຍ້ອນຫຍັງ', () => go('bonusStaff', ym + '|' + me), 'ghost')
+    ]);
+  }
   const rows = await BONUS.cycle(ym);
   const chips = await monthChips(ym, m => go('bonus', m));
 
@@ -417,6 +456,9 @@ SCREENS.bonus = async function (ym) {
 SCREENS.bonusStaff = async function (arg) {
   const [ym, name] = String(arg || '').split('|');
   if (!name) return go('bonus');
+  if (!canSeeBonusOf(name)) {
+    return render('ເບີ້ຍຂະຫຍັນ', '', [card([h('div', { class: 'note', text: 'ເບິ່ງໄດ້ສະເພາະເບີ້ຍຂອງຕົນເອງ' })])]);
+  }
   const rows = await BONUS.cycle(ym);
   const r = rows.find(x => x.name === name);
   if (!r) return go('bonus', ym);
@@ -477,7 +519,7 @@ SCREENS.bonusStaff = async function (arg) {
     }, 'danger')
   ]);
 
-  const adjCard = adjs.length ? card([
+  const adjCard = S.manager && adjs.length ? card([
     h('h3', { class: 'ttl', text: 'ການຫັກທີ່ບັນທຶກເອງ' }),
     ...adjs.map(a => h('div', { class: 'li', 'data-ui': 'content' }, [
       h('div', { class: 'li-m' }, [
@@ -510,7 +552,7 @@ SCREENS.bonusStaff = async function (arg) {
     ...lineCards,
     !r.lines.length ? card([h('div', { class: 'note', text: 'ເດືອນນີ້ບໍ່ມີການຫັກ — ໄດ້ເບີ້ຍເຕັມ' })]) : null,
     adjCard,
-    addCard,
+    S.manager ? addCard : null,
     btn('ກັບໄປລາຍຊື່', () => go('bonus', ym), 'ghost')
   ]);
 };
@@ -602,6 +644,27 @@ SCREENS.config = async function () {
   }
 
   /* ເບີ້ຍຂະຫຍັນ — ຈໍານວນເງິນທັງໝົດແກ້ໄດ້ຢູ່ນີ້ບ່ອນດຽວ */
+  /* ໂໝດຜູ້ຈັດການ — ລະຫັດຢູ່ໃນເຄື່ອງນີ້ເທົ່ານັ້ນ */
+  const mgrHas = !!(await DB.setting('mgrHash'));
+  const mgrPin = input({ type: 'password', inputmode: 'numeric', autocomplete: 'off', placeholder: '4 ຕົວຂຶ້ນໄປ' });
+  const mgrCard = card([
+    h('h3', { class: 'ttl', text: 'ໂໝດຜູ້ຈັດການ' }),
+    h('div', { class: 'muted', text: S.manager ? 'ເປີດຢູ່ — ເຫັນເບີ້ຍຂອງທຸກຄົນ' :
+      'ປິດຢູ່ — ພະນັກງານເຫັນສະເພາະເບີ້ຍຂອງຕົນເອງ' }),
+    rowLabel(mgrHas ? 'ລະຫັດຜູ້ຈັດການ' : 'ຕັ້ງລະຫັດຜູ້ຈັດການ (4 ຕົວຂຶ້ນໄປ)', mgrPin),
+    S.manager
+      ? btn('ອອກຈາກໂໝດຜູ້ຈັດການ', async () => { S.manager = false; go('config'); }, 'ghost')
+      : btn(mgrHas ? 'ປົດລັອກ' : 'ບັນທຶກລະຫັດ', async () => {
+          const pin = mgrPin.value.trim();
+          if (pin.length < 4) return U.toast('ລະຫັດຕ້ອງ 4 ຕົວຂຶ້ນໄປ', 'err');
+          if (mgrHas) {
+            if (!(await MGR.check(pin))) return U.toast('ລະຫັດບໍ່ຖືກ', 'err');
+          } else {
+            await MGR.setPin(pin);
+          }
+          S.manager = true; U.toast('ເປີດໂໝດຜູ້ຈັດການແລ້ວ'); go('config');
+        }, 'primary')
+  ]);
   const bonusCard = card([
     h('h3', { class: 'ttl', text: 'ເບີ້ຍຂະຫຍັນ' }),
     h('div', { class: 'muted', text: 'ທຸກຄົນເລີ່ມເດືອນດ້ວຍເບີ້ຍເຕັມ ແລ້ວຫັກລົງຕາມສິ່ງທີ່ເກີດຂຶ້ນຈິງ' }),
@@ -677,6 +740,7 @@ SCREENS.config = async function () {
         input({ type: 'time', value: sdef.end, onchange: e => { st.shifts[i].end = e.target.value; saveSetting('shifts', st.shifts); } })
       ]))
     ]),
+    mgrCard,
     bonusCard,
     sheetCard,
     cancelCard,
