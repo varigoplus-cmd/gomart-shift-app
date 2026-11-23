@@ -451,11 +451,6 @@ SCREENS.home = async function () {
       extra: `${p.counts.closePhotos}/${p.counts.closeNeed} ຈຸດ` },
     { icon: '✓', phase: 'ປິດກະ', label: 'ເຊັກລິສຕ໌ປະຈໍາວັນ', hint: 'ກວດ ' + p.dailyNeed + ' ຂໍ້ກ່ອນປິດກະ',
       done: p.daily >= p.dailyNeed, go: () => go('daily'), extra: `${p.daily}/${p.dailyNeed} ຂໍ້` },
-    { icon: '₭', phase: 'ປິດກະ', label: 'ນັບເງິນ + ທຽບເຄື່ອງຂາຍ', hint: 'ນັບໃບເງິນ ແລະ ອ່ານຍອດຈາກເຄື່ອງຂາຍ',
-      done: !!p.cash, go: () => go('cash'), alert: cashBad,
-      extra: p.cash
-        ? `ນັບໄດ້ ${U.kip(p.cash.counted)} · ສ່ວນຕ່າງ ${U.kip(p.cash.variance)} ກີບ · ບັນທຶກ ${p.savedAt.cash}`
-        : '' }
   ];
   const doneN = TASKS.filter(t => t.done).length;
   const next = TASKS.find(t => !t.done);
