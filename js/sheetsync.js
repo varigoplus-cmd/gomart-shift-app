@@ -2,6 +2,9 @@
  * ຕັ້ງ URL ແລະ ລະຫັດໃນ ຕັ້ງຄ່າ → ເຊື່ອມ Google Sheets (ບໍ່ຝັງໃນໂຄ້ດ)
  * ເກັບຄິວໄວ້ໃນເຄື່ອງກ່ອນ ເນັດຂາດກໍ່ບໍ່ເສຍ ສົ່ງຊ້ໍາໄດ້ປອດໄພ (ລະຫັດແຖວຄົງທີ່) */
 const SHEETSYNC = (() => {
+  /* ລິງ Apps Script ບໍ່ຖືວ່າເປັນຄວາມລັບ — ລະຫັດ (SHEET_TOKEN) ຍັງຕ້ອງໃສ່ໃນແຕ່ລະເຄື່ອງ */
+  const DEFAULT_URL = 'https://script.google.com/macros/s/AKfycbxm1aYFSTsMb87IuZshZM9KlBHWymx06bew63tq68UzcO-AXpNRn0FyVJiMvq6u0NvY/exec';
+
   const COLS = ['ລະຫັດ','ວັນທີ','ເວລາ','ສາຂາ','ກະ','ຜູ້ບັນທຶກ','ປະເພດ','ໝວດ','ລາຍການ','ຈໍານວນ','ຫົວໜ່ວຍ','ເຫດຜົນ / ລາຍລະອຽດ','ຜູ້ອະນຸມັດ','ສະຖານະ','ອັບເດດລ່າສຸດ','ໝາຍເຫດ'];
 
   function row(id, { date, time, branch, shift, staff, type, cat, item, qty, unit, note, status }) {
@@ -29,7 +32,7 @@ const SHEETSYNC = (() => {
   /* ສົ່ງຄິວ ຖ້າຍັງບໍ່ໄດ້ຕັ້ງຄ່າ ເກັບໄວ້ກ່ອນ */
   function flush() { return serial(doFlush); }
   async function doFlush() {
-    const url = await DB.setting('sheetUrl');
+    const url = (await DB.setting('sheetUrl')) || DEFAULT_URL;
     const token = await DB.setting('sheetToken');
     const q = (await DB.setting('sheetQueue')) || [];
     if (!url || !token || q.length === 0) return { sent: 0, pending: q.length };
@@ -55,5 +58,5 @@ const SHEETSYNC = (() => {
     } catch (err) { return { ok: false, error: 'ເຊື່ອມຕໍ່ບໍ່ໄດ້' }; }
   }
 
-  return { COLS, row, queue, flush, test };
+  return { COLS, row, queue, flush, test, DEFAULT_URL };
 })();

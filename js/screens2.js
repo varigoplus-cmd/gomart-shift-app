@@ -640,13 +640,13 @@ SCREENS.config = async function () {
   const sheetCard = card([
     h('h3', { class: 'ttl', text: 'ເຊື່ອມ Google Sheets' }),
     h('div', { class: 'muted', text: 'ທຸກກະທີ່ເປີດ/ປິດຈະຖືກສົ່ງເຂົ້າແຜ່ນ ເນັດຂາດຈະເກັບໄວ້ແລ້ວສົ່ງທີຫຼັງ' }),
-    rowLabel('ລິງ Apps Script (Web app URL)', input({ value: st.sheetUrl || '', placeholder: 'https://script.google.com/…',
+    rowLabel('ລິງ Apps Script (Web app URL)', input({ value: st.sheetUrl || SHEETSYNC.DEFAULT_URL, placeholder: 'https://script.google.com/…',
       onchange: e => saveSetting('sheetUrl', e.target.value.trim()) })),
     rowLabel('ລະຫັດ (SHEET_TOKEN)', input({ type: 'password', value: st.sheetToken || '', autocomplete: 'off',
       onchange: e => saveSetting('sheetToken', e.target.value.trim()) })),
     h('div', { class: 'addrow' }, [
       btn('ທົດສອບການເຊື່ອມຕໍ່', async () => {
-        const r = await SHEETSYNC.test(st.sheetUrl || '', st.sheetToken || '');
+        const r = await SHEETSYNC.test(st.sheetUrl || SHEETSYNC.DEFAULT_URL, st.sheetToken || '');
         U.toast(r.ok ? 'ເຊື່ອມຕໍ່ໄດ້ແລ້ວ' : 'ເຊື່ອມບໍ່ໄດ້: ' + r.error, r.ok ? undefined : 'err');
       }, 'ghost'),
       btn('ສົ່ງຄິວດຽວນີ້', async () => {
