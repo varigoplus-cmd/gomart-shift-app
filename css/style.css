@@ -621,3 +621,23 @@ select.in{appearance:none;background-image:
   .sheet-wrap{align-items:center}
   .sheet{border-radius:var(--r3);margin:0 var(--s4)}
 }
+
+/* ຈຸດຖ່າຍທີ່ສໍາເລັດແລ້ວ — ແຖວສັ້ນ ບໍ່ແຍ່ງພື້ນທີ່ຈຸດທີ່ຍັງຕ້ອງເຮັດ */
+.pt-card-done{padding:10px 12px}
+.pt-done{display:flex;align-items:center;gap:var(--s3)}
+.pt-thumb{width:56px;height:56px;flex:0 0 56px;object-fit:cover;border-radius:var(--r1);background:var(--surface-2)}
+.pt-meta{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pt-meta .pt-l{font-size:15px}
+
+/* ປ້າຍຊ່ວງກະໃນລິດງານດຽວ */
+.phase-k{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.3px;
+  padding:var(--s3) 0 var(--s1);text-transform:none}
+.phase-k:first-child{padding-top:0}
+
+/* ເຊັກລິສຕ໌ປະຈໍາວັນ */
+.dly{padding:12px 0;border-bottom:1px solid var(--line)}
+.dly:last-child{border-bottom:0}
+.dly-t{font-size:15px;font-weight:600;margin-bottom:4px}
+.dly-sub{margin:0 0 8px 18px;padding:0;color:var(--muted);font-size:13px;line-height:1.6}
+.dly-btns{display:flex;gap:var(--s2)}
+.dly-btns .btn{flex:1}

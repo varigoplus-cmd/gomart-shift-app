@@ -627,6 +627,15 @@ SCREENS.config = async function () {
               } })))
   ]);
 
+  /* ລຶບກະທີ່ເປີດຜິດ — ຍ້າຍມາຈາກໜ້າຫຼັກ ບໍ່ໃຫ້ກົດຜິດຕອນເຮັດວຽກ */
+  const cancelCard = card([
+    h('h3', { class: 'ttl', text: 'ກະທີ່ເປີດຜິດ' }),
+    h('div', { class: 'muted', text: 'ໃຊ້ສະເພາະເມື່ອເປີດກະຜິດສາຂາ ຫຼື ຜິດກະ — ຂໍ້ມູນທີ່ຕື່ມໄວ້ທັງໝົດຂອງກະນີ້ຈະຫາຍໄປ' }),
+    S.shift
+      ? btn('ລຶບກະນີ້ຖິ້ມ', cancelShift, 'danger-quiet')
+      : h('div', { class: 'note', text: 'ຍັງບໍ່ມີກະທີ່ເປີດຢູ່' })
+  ], 'danger-zone');
+
   render('ຕັ້ງຄ່າ', 'ລະບົບ v' + CONFIG.version, [
     listEditor('branches', 'ສາຂາ', 'ຊື່ສາຂາໃໝ່'),
     listEditor('zones', 'ໂຊນສິນຄ້າ', 'ຊື່ໂຊນໃໝ່'),
@@ -649,6 +658,7 @@ SCREENS.config = async function () {
       ]))
     ]),
     bonusCard,
+    cancelCard,
     card([
       h('h3', { class: 'ttl', text: 'ໜ້າຕາ' }),
       h('div', { class: 'muted', text: 'ໂໝດມືດຊ່ວຍເວລາເຮັດກະກາງຄືນ ຕັ້ງແຍກຕໍ່ເຄື່ອງ' }),

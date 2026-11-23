@@ -18,7 +18,12 @@ function normStaff(raw) {
 
 async function loadSettings() {
   const d = CONFIG.defaults;
-  const rawStaff = await DB.setting('staff');
+  /* ລາຍຊື່ຊຸດນີ້ຕັ້ງຄ່າໃໝ່ຄັ້ງດຽວ (ແທນຊື່ສົມມຸດເກົ່າ) ຫຼັງຈາກນັ້ນແກ້ໄດ້ປົກກະຕິ */
+  let rawStaff = await DB.setting('staff');
+  if (!(await DB.setting('staffSeedV2'))) {
+    rawStaff = null;
+    await DB.setting('staffSeedV2', true);
+  }
   S.settings = {
     branches: await DB.setting('branches') || d.branches.slice(),
     staff: normStaff(rawStaff),
@@ -78,6 +83,8 @@ async function progress(shift) {
       cash: clock(cash && cash.ts)
     },
     checklist:  checks.some(c => c.form === 'checklist'),
+    daily:      checks.filter(c => c.form === 'daily' && c.ok != null).length,
+    dailyNeed:  CONFIG.dailyChecklist.reduce((a, sec) => a + sec.items.length, 0),
     temps1:     temps.some(t => t.round === 1),
     temps2:     temps.some(t => t.round === 2),
     photosOpen: openPts.every(k => po.has(k)),
@@ -351,6 +358,8 @@ SCREENS.home = async function () {
     { icon: '◉', phase: 'ປິດກະ', label: 'ຮູບປິດກະ', hint: 'ຖ່າຍ ' + p.counts.closeNeed + ' ຈຸດ ລວມ Z-Report',
       done: p.photosClose, go: () => go('photos', 'close'),
       extra: `${p.counts.closePhotos}/${p.counts.closeNeed} ຈຸດ` },
+    { icon: '✓', phase: 'ປິດກະ', label: 'ເຊັກລິສຕ໌ປະຈໍາວັນ', hint: 'ກວດ ' + p.dailyNeed + ' ຂໍ້ກ່ອນປິດກະ',
+      done: p.daily >= p.dailyNeed, go: () => go('daily'), extra: `${p.daily}/${p.dailyNeed} ຂໍ້` },
     { icon: '₭', phase: 'ປິດກະ', label: 'ນັບເງິນ + ທຽບ POS', hint: 'ນັບໃບເງິນ ແລະ ອ່ານຍອດຈາກ POS',
       done: !!p.cash, go: () => go('cash'), alert: cashBad,
       extra: p.cash
@@ -402,11 +411,6 @@ SCREENS.home = async function () {
                     'aria-label': 'ເບິ່ງລາຍລະອຽດເບີ້ຍຂະຫຍັນ',
                     onclick: () => go('bonusStaff', cyc + '|' + sh.staff) }, '›')
     ]),
-    h('div', { class: 'hero-chips' }, [
-      hchip('ກະໃນຮອບນີ້', String(b.shiftCount)),
-      hchip('ຫັກໄປແລ້ວ', b.deducted ? U.kip(b.deducted) : '—'),
-      hchip('ງານມື້ນີ້', doneN + '/' + TASKS.length)
-    ])
   ]);
 
   const body = [
@@ -419,25 +423,19 @@ SCREENS.home = async function () {
 
     nextCard,
 
-    h('h3', { class: 'sec', text: 'ເປີດກະ' }),
-    phaseCard('ເປີດກະ'),
-
-    h('h3', { class: 'sec', text: 'ລະຫວ່າງກະ' }),
+    /* ງານທັງໝົດຢູ່ລິດດຽວ ແບ່ງດ້ວຍປ້າຍເລັກ — ບໍ່ແຍກເປັນສາມກ່ອງ */
     card([
-      ...TASKS.filter(t => t.phase === 'ລະຫວ່າງກະ')
-        .map(t => taskRow(t.label, t.done, t.go, t.extra, { icon: t.icon })),
-      taskRow('ແຈ້ງບັນຫາ', false, () => go('issueNew'), 'ເມື່ອພົບສິ່ງຜິດປົກກະຕິ', { icon: '!' })
-    ], 'tasks'),
-
-    h('h3', { class: 'sec', text: 'ປິດກະ' }),
-    phaseCard('ປິດກະ'),
-
-    /* ເຂດອັນຕະລາຍ — ແຍກອອກຈາກປຸ່ມປິດກະ ບໍ່ໃຫ້ກົດຜິດ */
-    h('h3', { class: 'sec danger-sec', text: 'ເຂດອັນຕະລາຍ' }),
-    card([
-      h('div', { class: 'muted', text: 'ໃຊ້ສະເພາະເມື່ອເປີດກະຜິດສາຂາ ຫຼື ຜິດກະ ຂໍ້ມູນທີ່ຕື່ມໄວ້ທັງໝົດຂອງກະນີ້ຈະຫາຍໄປ' }),
-      btn('ລຶບກະນີ້ຖິ້ມ', cancelShift, 'danger-quiet')
-    ], 'danger-zone')
+      h('div', { class: 'phase-k', text: 'ເປີດກະ' }),
+      ...TASKS.filter(t => t.phase === 'ເປີດກະ').map(t =>
+        taskRow(t.label, t.done, t.go, t.extra, { alert: t.alert, icon: t.icon })),
+      h('div', { class: 'phase-k', text: 'ລະຫວ່າງກະ' }),
+      ...TASKS.filter(t => t.phase === 'ລະຫວ່າງກະ').map(t =>
+        taskRow(t.label, t.done, t.go, t.extra, { alert: t.alert, icon: t.icon })),
+      taskRow('ແຈ້ງບັນຫາ', false, () => go('issueNew'), 'ເມື່ອພົບສິ່ງຜິດປົກກະຕິ', { icon: '!' }),
+      h('div', { class: 'phase-k', text: 'ປິດກະ' }),
+      ...TASKS.filter(t => t.phase === 'ປິດກະ').map(t =>
+        taskRow(t.label, t.done, t.go, t.extra, { alert: t.alert, icon: t.icon }))
+    ], 'tasks')
   ];
   render(sh.branch,
          `${def.label} · ${sh.staff} · ເຊັກອິນ ${U.stamp(sh.openedAt).slice(-5)}`, body,
@@ -871,15 +869,37 @@ SCREENS.photos = async function (phase) {
       catch (err) { U.toast('ບັນທຶກຮູບບໍ່ໄດ້: ' + err.message, 'err'); }
     }
 
+    /* ຈຸດທີ່ຖ່າຍແລ້ວ: ແຖວສັ້ນ ບໍ່ໃຫ້ຮູບໃຫຍ່ຊ້ອນກັນ ບໍ່ໃຫ້ປຸ່ມຖ່າຍໃໝ່ເດັ່ນ */
+    if (existing) {
+      const small = h('div', { class: 'pt-done' }, [
+        h('img', { class: 'pt-thumb', src: URL.createObjectURL(existing.blob), alt: pt.label }),
+        h('div', { class: 'pt-meta' }, [
+          h('div', { class: 'pt-l', text: '✓ ' + pt.label }),
+          h('small', { class: 'muted',
+            text: 'ຖ່າຍ ' + U.stamp(existing.ts).slice(-5) +
+                  (existing.source && existing.source !== 'camera' ? ' · ⚠ ທາງສໍາຮອງ' : '') })
+        ]),
+        btn('ຖ່າຍໃໝ່', async () => {
+          /* ຖ່າຍໃໝ່ຕ້ອງຢືນຢັນ — ກັນແຕະພລາດແລ້ວຮູບເກົ່າຫາຍ */
+          const ok = await confirmSheet({
+            title: 'ຖ່າຍໃໝ່ຈຸດນີ້?',
+            lines: [pt.label, 'ຮູບເກົ່າຈະຖືກແທນທີ່ດ້ວຍຮູບໃໝ່'],
+            confirmLabel: 'ຖ່າຍໃໝ່'
+          });
+          if (ok) return shoot();
+        }, 'ghost sm', 'ກຳລັງເປີດກ້ອງ…')
+      ]);
+      return card([small, file], 'pt-card-done');
+    }
+
     return card([
       h('div', { class: 'pt-top' }, [
         h('div', {}, [h('div', { class: 'pt-l', text: pt.label }),
                       pt.hint ? h('small', { class: 'muted', text: pt.hint }) : null]),
-        statusPill(!!existing, 'ຖ່າຍແລ້ວ', 'ຍັງ')
+        statusPill(false, 'ຖ່າຍແລ້ວ', 'ຍັງ')
       ]),
-      thumb,
       file,
-      btn(existing ? 'ຖ່າຍໃໝ່' : 'ຖ່າຍຮູບ', shoot,
+      btn('ຖ່າຍຮູບ', shoot,
           pt.key === nextKey ? 'primary' : 'ghost', 'ກຳລັງເປີດກ້ອງ…')
     ]);
   });
@@ -887,6 +907,48 @@ SCREENS.photos = async function (phase) {
   const allDone = !nextKey;
   cards.push(card([btn('ກັບໜ້າຫຼັກ', () => go('home'), allDone ? 'primary big-btn' : 'ghost big-btn')]));
   render(phase === 'open' ? 'ຮູບເປີດກະ' : 'ຮູບປິດກະ', `${taken.length}/${pts.length} ຈຸດ`, cards);
+};
+
+/* ---------- ເຊັກລິສຕ໌ປະຈໍາວັນ (ກ່ອນປິດກະ) ---------- */
+SCREENS.daily = async function () {
+  const sh = S.shift; if (!sh) return go('home');
+  const rows = (await DB.by('checks', 'shiftId', sh.id)).filter(c => c.form === 'daily');
+  const byKey = {}; rows.forEach(r => byKey[r.itemKey] = r);
+  const all = CONFIG.dailyChecklist.flatMap(s => s.items);
+  const doneN = all.filter(i => byKey[i.key] && byKey[i.key].ok != null).length;
+
+  /* ບັນທຶກທັນທີທີ່ແຕະ — ກົດຊໍ້າບໍ່ສ້າງແຖວໃໝ່ (id ຄົງທີ່) */
+  async function mark(it, ok) {
+    await DB.put('checks', {
+      id: 'dly_' + sh.id + '_' + it.key, shiftId: sh.id, form: 'daily',
+      itemKey: it.key, label: it.label, ok, ts: new Date().toISOString()
+    });
+    /* ຂໍ້ທີ່ຍັງບໍ່ໄດ້ເຮັດ ສ້າງວຽກຕິດຕາມອັດຕະໂນມັດ */
+    if (ok === false) await autoIssues(['ເຊັກລິສຕ໌ປະຈໍາວັນ: ' + it.label]);
+    go('daily');
+  }
+
+  const sections = CONFIG.dailyChecklist.map(sec => card([
+    h('h3', { class: 'ttl', text: sec.section }),
+    ...sec.items.map(it => {
+      const rec = byKey[it.key];
+      return h('div', { class: 'dly' }, [
+        h('div', { class: 'dly-t', text: it.label }),
+        h('ul', { class: 'dly-sub' }, it.subs.map(x => h('li', { text: x }))),
+        h('div', { class: 'dly-btns' }, [
+          btn('✓ ເຮັດແລ້ວ', () => mark(it, true), rec && rec.ok === true ? 'primary' : 'ghost'),
+          btn('✗ ຍັງບໍ່ໄດ້', () => mark(it, false), rec && rec.ok === false ? 'danger-quiet' : 'ghost')
+        ])
+      ]);
+    })
+  ], 'dly-card'));
+
+  const body = [
+    card([h('div', { class: 'note', text: 'ກວດທຸກຂໍ້ກ່ອນປິດກະ — ຍັງເຫຼືອ ' + (all.length - doneN) + ' ຂໍ້' })]),
+    ...sections,
+    card([btn('ກັບໜ້າຫຼັກ', () => go('home'), doneN === all.length ? 'primary big-btn' : 'ghost big-btn')])
+  ];
+  render('ເຊັກລິສຕ໌ປະຈໍາວັນ', doneN + '/' + all.length + ' ຂໍ້', body);
 };
 
 /* ---------- ເງິນທອນຕັ້ງຕົ້ນ ---------- */
