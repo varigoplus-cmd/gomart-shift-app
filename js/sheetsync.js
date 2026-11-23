@@ -14,15 +14,21 @@ const SHEETSYNC = (() => {
   }
 
   /* ເພີ່ມເຫດການເຂົ້າຄິວ */
-  async function queue(ev) {
-    const q = (await DB.setting('sheetQueue')) || [];
-    q.push(ev);
-    await DB.setting('sheetQueue', q.slice(-500));
-    flush();
+  /* ທຸກການອ່าน-ແກ້ໄຂຄິວເຮັດຕາມລໍາດັບ ບໍ່ໃຫ້ສອງເຫດການຂຽນທັບກັນ */
+  let chain = Promise.resolve();
+  function serial(fn) { chain = chain.then(fn, fn); return chain; }
+
+  function queue(ev) {
+    return serial(async () => {
+      const q = (await DB.setting('sheetQueue')) || [];
+      q.push(ev);
+      await DB.setting('sheetQueue', q.slice(-500));
+    }).then(() => flush());
   }
 
   /* ສົ່ງຄິວ ຖ້າຍັງບໍ່ໄດ້ຕັ້ງຄ່າ ເກັບໄວ້ກ່ອນ */
-  async function flush() {
+  function flush() { return serial(doFlush); }
+  async function doFlush() {
     const url = await DB.setting('sheetUrl');
     const token = await DB.setting('sheetToken');
     const q = (await DB.setting('sheetQueue')) || [];

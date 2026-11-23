@@ -1,6 +1,6 @@
 /* Service worker — ເຮັດໃຫ້ແອັບເປີດໄດ້ເຖິງບໍ່ມີເນັດ */
-const CACHE = 'gomart-shift-1.8.0';
-const V = '1.8.0';   /* ຕ້ອງຕົງກັບ ?v= ໃນ index.html */
+const CACHE = 'gomart-shift-1.8.1';
+const V = '1.8.1';   /* ຕ້ອງຕົງກັບ ?v= ໃນ index.html */
 const ASSETS = [
   './index.html', './manifest.json',
   './img/logo-64.png', './img/logo-96.png', './img/logo-180.png',

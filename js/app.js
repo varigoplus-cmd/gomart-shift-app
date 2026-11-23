@@ -1,5 +1,13 @@
 /* GO+MART Shift System — ແອັບຫຼັກ */
 const h = U.el;
+
+/* ສົ່ງເຫດການໄປແຜ່ນ — ລະຫັດແຖວຄົງທີ່ ສົ່ງຊໍ້າຈະບໍ່ເພີ່ມແຖວຊ້ໍາ */
+function syncEvt(sh, id, f) {
+  SHEETSYNC.queue({ row: SHEETSYNC.row(id, {
+    date: sh.date, time: U.nowTime(), branch: sh.branch, shift: shiftDef(sh.shiftKey).label,
+    staff: sh.staff, type: f.type, cat: f.cat, item: f.item, qty: f.qty, unit: f.unit,
+    note: f.note, status: f.status || 'ບັນທຶກແລ້ວ' }) });
+}
 let S = {            /* ສະຖານະແອັບ */
   settings: null,
   shift: null,       /* ກະທີ່ກໍາລັງເປີດຢູ່ */
@@ -504,7 +512,7 @@ function screenStartShift() {
       };
       await DB.put('shifts', shift);
       SHEETSYNC.queue({ row: SHEETSYNC.row('OPEN-' + shift.id, {
-        date: shift.date, time: U.nowTime(), branch, shift: def.label, staff: nm,
+        date: shift.date, time: U.nowTime(), branch, shift: def().label, staff: nm,
         type: 'ເປີດກະ', note: 'ເຊັກອິນ ' + U.nowTime() + (lateBy > st.lateMinutes ? ' · ຊ້າ ' + lateBy + ' ນາທີ' : ''),
         status: 'ເປີດຢູ່' }) });
       if (!people.some(x => x.name === nm))
@@ -656,6 +664,9 @@ SCREENS.checklist = async function () {
     })));
     const bad = all.filter(i => state[i.key].ok === false);
     if (bad.length) await autoIssues(bad.map(i => `ເຊັກລິສຕ໌: ${i.label} — ${state[i.key].note || 'ບໍ່ຜ່ານ'}`));
+    syncEvt(sh, 'CHK-' + sh.id, { type: 'ເຊັກລິສຕ໌', cat: 'ໜ້າຮ້ານ', item: 'ເຊັກລິສຕ໌ໜ້າຮ້ານ',
+      qty: all.length - bad.length, unit: 'ຂໍ້ຜ່ານ',
+      note: `ຜ່ານ ${all.length - bad.length}/${all.length}` + (bad.length ? ' · ບໍ່ຜ່ານ: ' + bad.map(i => i.label).join(', ') : '') });
     await clearDraft(sh, 'checklist');
     U.toast('ບັນທຶກແລ້ວ');
     go('home');
@@ -793,6 +804,12 @@ SCREENS.equipment = async function (round) {
         condition: state[e.key].ok, note: state[e.key].note || '',
         ts: new Date().toISOString()
       })));
+      const outN = CONFIG.equipment.filter(e => {
+        const c = state[e.key].c; return c != null && e.min !== null && (c < e.min || c > e.max);
+      }).length;
+      syncEvt(sh, 'TMP-' + sh.id + '-' + round, { type: 'ກວດເຄື່ອງໃຊ້', cat: 'ຮອບ ' + round,
+        item: 'ເຄື່ອງໃຊ້ ຮອບ ' + round, qty: outN, unit: 'ຈຸດນອກເກນ',
+        note: outN ? 'ມີຈຸດນອກເກນ — ຕ້ອງແຈ້ງຜູ້ຈັດການ' : 'ທຸກຈຸດຢູ່ໃນເກນ' });
 
       const problems = CONFIG.equipment.filter(e => {
         const s = state[e.key];
@@ -844,6 +861,9 @@ SCREENS.photos = async function (phase) {
       blob, gps: pos, source,              /* camera = ກ້ອງໃນແອັບ · fallback = ທາງສໍາຮອງ */
       ts: new Date().toISOString(), staff: sh.staff, branch: sh.branch
     });
+    syncEvt(sh, 'PHT-' + sh.id + '-' + phase + '-' + pt.key + '-' + Date.now(), { type: 'ຖ່າຍຮູບ',
+      cat: phase === 'open' ? 'ເປີດກະ' : 'ປິດກະ', item: pt.label, qty: 1, unit: 'ຮູບ',
+      note: source === 'camera' ? 'ກ້ອງໃນແອັບ' : 'ທາງສໍາຮອງ ⚠ ບໍ່ໄດ້ຖ່າຍຜ່ານກ້ອງໃນແອັບ' });
     U.toast(source === 'camera' ? 'ບັນທຶກຮູບແລ້ວ' : 'ບັນທຶກແລ້ວ (ບໍ່ໄດ້ໃຊ້ກ້ອງໃນແອັບ)');
     go('photos', phase);
   }
@@ -949,6 +969,12 @@ SCREENS.daily = async function () {
     });
     /* ຂໍ້ທີ່ຍັງບໍ່ໄດ້ເຮັດ ສ້າງວຽກຕິດຕາມອັດຕະໂນມັດ */
     if (ok === false) await autoIssues(['ເຊັກລິສຕ໌ປະຈໍາວັນ: ' + it.label]);
+    const answered = (await DB.by('checks', 'shiftId', sh.id)).filter(c => c.form === 'daily' && c.ok != null).length;
+    if (answered === all.length) {
+      syncEvt(sh, 'DLY-' + sh.id, { type: 'ເຊັກລິສຕ໌ປະຈໍາວັນ', cat: 'ກ່ອນປິດກະ',
+        item: 'ເຊັກລິສຕ໌ປະຈໍາວັນ', qty: all.length, unit: 'ຂໍ້',
+        note: 'ກວດຄົບ ' + all.length + ' ຂໍ້' });
+    }
     go('daily');
   }
 
