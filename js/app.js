@@ -503,6 +503,10 @@ function screenStartShift() {
         earlyBy: 0, float: null, status: 'open'
       };
       await DB.put('shifts', shift);
+      SHEETSYNC.queue({ row: SHEETSYNC.row('OPEN-' + shift.id, {
+        date: shift.date, time: U.nowTime(), branch, shift: def.label, staff: nm,
+        type: 'ເປີດກະ', note: 'ເຊັກອິນ ' + U.nowTime() + (lateBy > st.lateMinutes ? ' · ຊ້າ ' + lateBy + ' ນາທີ' : ''),
+        status: 'ເປີດຢູ່' }) });
       if (!people.some(x => x.name === nm))
         await saveSetting('staff', [...st.staff, { name: nm, shiftKey, type: 'full' }]);
       U.toast('ເຊັກອິນ ' + U.nowTime() + ' ແລ້ວ');
@@ -577,6 +581,11 @@ async function closeShift() {
   sh.earlyBy = earlyBy;
   sh.closedAt = new Date().toISOString();
   await DB.put('shifts', sh);
+  SHEETSYNC.queue({ row: SHEETSYNC.row('CLOSE-' + sh.id, {
+    date: sh.date, time: U.nowTime(), branch: sh.branch, shift: def.label, staff: sh.staff,
+    type: 'ປິດກະ', qty: p.cash ? p.cash.variance : '', unit: 'ກີບ',
+    note: 'ສ່ວນຕ່າງເງິນສົດ ' + U.kip(v) + (earlyBy ? ' · ອອກກ່ອນ ' + earlyBy + ' ນາທີ' : ''),
+    status: 'ປິດແລ້ວ' }) });
   await clearShiftDrafts(sh.id);
   S.shift = null;
   U.toast('ປິດກະສໍາເລັດ');
