@@ -697,12 +697,15 @@ SCREENS.equipment = async function (round) {
     const warn = h('div', { class: 'warn small', style: 'display:none' });
 
     const specId = 'eqspec_' + round + '_' + eq.key;
+    /* ແປ້ນຕົວເລກມືຖື iPhone ບໍ່ມີເຄື່ອງໝາຍລົບ ຈຶ່ງໃຊ້ຊ່ອງຂໍ້ຄວາມ + ປຸ່ມ +/− */
     const tempIn = hasTemp ? input({
-      class: 'in temp', type: 'number', step: '0.1', inputmode: 'decimal',
+      class: 'in temp', type: 'text', inputmode: 'text', autocomplete: 'off',
       'aria-labelledby': specId,
       placeholder: '°C', value: cur.c ?? '',
       oninput: e => {
-        const v = e.target.value;
+        const clean = e.target.value.replace(/[^0-9.\-]/g, '').replace(/(?!^)-/g, '');
+        if (clean !== e.target.value) e.target.value = clean;
+        const v = clean;
         state[eq.key] = { ...(state[eq.key] || {}), c: v === '' ? null : U.num(v) };
         const n = U.num(v);
         const bad = v !== '' && (n < eq.min || n > eq.max);
@@ -733,10 +736,22 @@ SCREENS.equipment = async function (round) {
       tick();
     };
 
+    /* ປຸ່ມສະຫຼັບເຄື່ອງໝາຍ ± — ແຕະຄັ້ງດຽວໄດ້ຄ່າລົບ/ບວກ */
+    const signBtn = hasTemp ? h('button', {
+      class: 'yn sign', type: 'button', 'aria-label': 'ສະຫຼັບເຄື່ອງໝາຍ ບວກ/ລົບ', text: '+/−',
+      onclick: () => {
+        const v = tempIn.value.trim();
+        tempIn.value = v.startsWith('-') ? v.slice(1) : (v === '' ? '-' : '-' + v);
+        tempIn.dispatchEvent(new Event('input', { bubbles: true }));
+        tempIn.focus();
+      }
+    }) : null;
+
     const row = h('div', { class: 'ck eq' }, [
       h('div', { class: 'ck-l' }, [h('span', { text: eq.label }),
                                    h('small', { id: specId, text: spec })]),
       h('div', { class: 'ck-b' }, [
+        signBtn,
         tempIn,
         h('button', { class: 'yn yes' + (cur.ok === true ? ' on' : ''), onclick: () => mark(true), text: '✓' }),
         h('button', { class: 'yn no' + (cur.ok === false ? ' on' : ''), onclick: () => mark(false), text: '✗' })
