@@ -56,7 +56,29 @@ async function loadSettings() {
   if (JSON.stringify(rawStaff) !== JSON.stringify(S.settings.staff))
     await DB.setting('staff', S.settings.staff);
 }
-const saveSetting = (k, v) => { S.settings[k] = v; return DB.setting(k, v); };
+/* ແຖວການຕັ້ງຄ່າທັງໝົດ ສໍາລັບສະແດງໃນແຜ່ນ — [ໝວດ, ລາຍການ, ຄ່າ] */
+function settingsRows() {
+  const st = S.settings, rows = [];
+  rows.push(['ສາຂາ', 'ລາຍຊື່ສາຂາ', st.branches.join(', ')]);
+  st.shifts.forEach(x => rows.push(['ເວລາກະ', x.label, x.start + ' – ' + x.end]));
+  st.staff.forEach(p => rows.push(['ພະນັກງານ', p.name,
+    (p.shiftKey ? (st.shifts.find(x => x.key === p.shiftKey) || {}).label : 'ບໍ່ກໍານົດກະ') + ' · ' + (p.type === 'weekend' ? 'ພາດທາມ' : 'ປະຈໍາ')]));
+  rows.push(['ເກນ', 'ສ່ວນຕ່າງເງິນສົດ (ກີບ)', st.cashVarianceLimit]);
+  rows.push(['ເກນ', 'ເຊັກອິນຊ້າ (ນາທີ)', st.lateMinutes]);
+  rows.push(['ເກນ', 'ເຊັກເອົາກ່ອນເວລາ (ນາທີ)', st.earlyMinutes]);
+  rows.push(['ເກນ', 'ຈໍານວນໂຊນຕໍ່ກະ', st.zonesPerShift]);
+  rows.push(['ເບີ້ຍ', 'ເບີ້ຍເຕັມປະຈໍາ (ກີບ/ຮອບ)', st.bonusFull]);
+  rows.push(['ເບີ້ຍ', 'ເບີ້ຍເຕັມພາດທາມ (ກີບ/ຮອບ)', st.bonusFullWeekend]);
+  rows.push(['ເບີ້ຍ', 'ຕັດຍອດທຸກວັນທີ', st.bonusCutDay]);
+  CONFIG.bonusRules.forEach(r => rows.push(['ກົດເບີ້ຍ', r.label, BONUS.amountOf(r.key)]));
+  return rows;
+}
+let _pushTimer = null;
+function pushSettingsSoon() {
+  clearTimeout(_pushTimer);
+  _pushTimer = setTimeout(() => SHEETSYNC.pushSettings(settingsRows()), 2000);
+}
+const saveSetting = (k, v) => { S.settings[k] = v; pushSettingsSoon(); return DB.setting(k, v); };
 
 /* ================= ຕົວຊ່ວຍ ================= */
 function shiftDef(key) { return S.settings.shifts.find(s => s.key === key) || S.settings.shifts[0]; }

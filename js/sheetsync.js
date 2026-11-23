@@ -58,5 +58,17 @@ const SHEETSYNC = (() => {
     } catch (err) { return { ok: false, error: 'ເຊື່ອມຕໍ່ບໍ່ໄດ້' }; }
   }
 
-  return { COLS, row, queue, flush, test, DEFAULT_URL };
+  /* ສົ່ງການຕັ້ງຄ່າປັດຈຸບັນໄປແຜ່ນ (ແຜ່ນສະແດງຜົນ ແອັບເປັນຜູ້ແກ້) */
+  async function pushSettings(rows) {
+    const url = (await DB.setting('sheetUrl')) || DEFAULT_URL;
+    const token = await DB.setting('sheetToken');
+    if (!url || !token) return { ok: false, error: 'ຍັງບໍ່ໄດ້ຕັ້ງລະຫັດ' };
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'text/plain' },
+        body: JSON.stringify({ token, action: 'settings', rows }) });
+      return await res.json();
+    } catch (err) { return { ok: false, error: 'ເຊື່ອມບໍ່ໄດ້' }; }
+  }
+
+  return { COLS, row, queue, flush, test, DEFAULT_URL, pushSettings };
 })();
