@@ -3,7 +3,7 @@
  * ເກັບຄິວໄວ້ໃນເຄື່ອງກ່ອນ ເນັດຂາດກໍ່ບໍ່ເສຍ ສົ່ງຊ້ໍາໄດ້ປອດໄພ (ລະຫັດແຖວຄົງທີ່) */
 const SHEETSYNC = (() => {
   /* ລິງ Apps Script ບໍ່ຖືວ່າເປັນຄວາມລັບ — ລະຫັດ (SHEET_TOKEN) ຍັງຕ້ອງໃສ່ໃນແຕ່ລະເຄື່ອງ */
-  const DEFAULT_URL = 'https://script.google.com/macros/s/AKfycbxm1aYFSTsMb87IuZshZM9KlBHWymx06bew63tq68UzcO-AXpNRn0FyVJiMvq6u0NvY/exec';
+  const DEFAULT_URL = 'https://script.google.com/macros/s/AKfycbxB1vrYjA7EjXbwC2NgzDwTTlKhFgwL6n9SkQSI9V6DmXtbL5iAzDW-OmCsoSD6PJQ9/exec';
 
   const COLS = ['ລະຫັດ','ວັນທີ','ເວລາ','ສາຂາ','ກະ','ຜູ້ບັນທຶກ','ປະເພດ','ໝວດ','ລາຍການ','ຈໍານວນ','ຫົວໜ່ວຍ','ເຫດຜົນ / ລາຍລະອຽດ','ຜູ້ອະນຸມັດ','ສະຖານະ','ອັບເດດລ່າສຸດ','ໝາຍເຫດ'];
 
@@ -71,5 +71,21 @@ const SHEETSYNC = (() => {
     } catch (err) { return { ok: false, error: 'ເຊື່ອມບໍ່ໄດ້' }; }
   }
 
-  return { COLS, row, queue, flush, test, DEFAULT_URL, pushSettings };
+  /* ດຶງທຸກແຖວຈາກແຜ່ນ (ທຸກເຄື່ອງ) ສໍາລັບໜ້າພາບລວມທີມງານຂອງຜູ້ຈັດການ
+   * ຄືນ { ok:true, rows:[...] } ຫຼື { ok:false, error } — ແຜ່ນເກົ່າທີ່ຍັງບໍ່ມີ action read ຈະຕອບ error */
+  async function readAll() {
+    const url = (await DB.setting('sheetUrl')) || DEFAULT_URL;
+    const token = await DB.setting('sheetToken');
+    if (!url || !token) return { ok: false, error: 'ຍັງບໍ່ໄດ້ຕັ້ງລະຫັດ Sheet ໃນເຄື່ອງນີ້' };
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'text/plain' },
+        body: JSON.stringify({ token, action: 'read' }) });
+      const out = await res.json();
+      if (!out.ok) return { ok: false, error: out.error || 'ດຶງຂໍ້ມູນບໍ່ໄດ້' };
+      if (!Array.isArray(out.rows)) return { ok: false, error: 'ແຜ່ນຍັງເປັນເວີຊັນເກົ່າ — ຕ້ອງອັບເດດ Apps Script' };
+      return { ok: true, rows: out.rows };
+    } catch (err) { return { ok: false, error: 'ເນັດຂາດ — ດຶງຂໍ້ມູນບໍ່ໄດ້' }; }
+  }
+
+  return { COLS, row, queue, flush, test, DEFAULT_URL, pushSettings, readAll };
 })();

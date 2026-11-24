@@ -282,6 +282,12 @@ SCREENS.report = async function (branchFilter) {
           btn('ໄປເປີດກະ', () => go('home'), 'ghost')
         ]),
 
+    S.manager ? h('h3', { class: 'sec', text: 'ທີມງານ' }) : null,
+    S.manager ? card([
+      h('div', { class: 'muted', text: 'ເບິ່ງວ່າແຕ່ລະຄົນເຮັດຫຍັງແລ້ວ ຈາກທຸກເຄື່ອງ' }),
+      btn('ເບິ່ງພາບລວມທີມງານ', () => go('team', 7), 'ghost')
+    ]) : null,
+
     h('h3', { class: 'sec', text: 'ເບີ້ຍຂະຫຍັນ' }),
     card([
       h('div', { class: 'muted', text: 'ຄິດຈາກຂໍ້ມູນກະຈິງ ບໍ່ມີການໃຫ້ຄະແນນດ້ວຍມື' }),
@@ -353,6 +359,97 @@ async function exportPhotos() {
   }
   U.toast('ດາວໂຫຼດຄົບແລ້ວ');
 }
+
+/* ---------- ພາບລວມທີມງານ (ຜູ້ຈັດການເທົ່ານັ້ນ) ----------
+ * ທຸກເຄື່ອງສົ່ງເຫດການເຂົ້າແຜ່ນດຽວກັນ ເຄື່ອງຜູ້ຈັດການຈຶ່ງດຶງຈາກແຜ່ນເພື່ອເຫັນທຸກຄົນ */
+SCREENS.team = async function (days) {
+  if (!S.manager) {
+    return render('ພາບລວມທີມງານ', 'ສະເພາະຜູ້ຈັດການ', [
+      card([
+        h('div', { class: 'note', text: 'ເປີດໂໝດຜູ້ຈັດການກ່ອນ ຈຶ່ງຈະເຫັນພາບລວມຂອງທຸກຄົນ' }),
+        btn('ໄປໜ້າຕັ້ງຄ່າ', () => go('config'), 'ghost')
+      ])
+    ]);
+  }
+  const n = [1, 7, 30].includes(Number(days)) ? Number(days) : 7;
+  const chips = h('div', { class: 'chips' }, [[1, 'ວັນນີ້'], [7, '7 ມື້'], [30, '30 ມື້']].map(([v, l]) =>
+    h('button', { class: 'chip' + (v === n ? ' on' : ''), 'data-ui': 'chip', onclick: () => go('team', v) }, l)));
+
+  const res = await SHEETSYNC.readAll();
+  if (!res.ok) {
+    return render('ພາບລວມທີມງານ', 'ດຶງຈາກແຜ່ນ Google Sheets', [
+      chips,
+      card([
+        h('div', { class: 'note', text: 'ດຶງຂໍ້ມູນບໍ່ໄດ້: ' + res.error }),
+        btn('ລອງໃໝ່', () => go('team', n), 'primary')
+      ])
+    ]);
+  }
+
+  /* ຊ່ວງວັນທີ ຄິດຕາມເວລາທ້ອງຖິ່ນ */
+  const f = new Date(); f.setDate(f.getDate() - (n - 1));
+  const from = [f.getFullYear(), String(f.getMonth() + 1).padStart(2, '0'), String(f.getDate()).padStart(2, '0')].join('-');
+  const C = SHEETSYNC.COLS;
+  const inRange = res.rows.filter(r => r[1] >= from && r[5]);
+
+  const people = {};
+  inRange.forEach(r => {
+    const name = String(r[5]);
+    if (!people[name]) people[name] = { name, shifts: new Set(), checks: 0, temps: 0, photos: 0, variance: 0, last: '' };
+    const p = people[name];
+    p.shifts.add(r[1] + '|' + r[4]);
+    const t = r[6];
+    if (t === 'ເຊັກລິສຕ໌' || t === 'ເຊັກລິສຕ໌ປະຈໍາວັນ') p.checks++;
+    if (t === 'ກວດເຄື່ອງໃຊ້') p.temps++;
+    if (t === 'ຖ່າຍຮູບ') p.photos++;
+    if (t === 'ປິດກະ') p.variance += Math.abs(Number(r[9]) || 0);
+    const stamp = r[1] + ' ' + (r[2] || '');
+    if (stamp > p.last) p.last = stamp;
+  });
+  const list = Object.values(people)
+    .sort((a, b) => b.shifts.size - a.shifts.size || a.name.localeCompare(b.name));
+
+  const sum = k => list.reduce((s, p) => s + (typeof k === 'function' ? k(p) : p[k]), 0);
+  const stat = (label, value) => h('div', { class: 'stat' }, [
+    h('div', { class: 'stat-v', text: value }), h('div', { class: 'stat-l', text: label })
+  ]);
+
+  const summaryHead = ['ຊື່', 'ກະ', 'ເຊັກລິສຕ໌', 'ກວດອຸນຫະພູມ', 'ຮູບ', 'ສ່ວນຕ່າງສົມບູນ (ກີບ)', 'ເຫັນຄັ້ງສຸດທ້າຍ'];
+  const exportSummary = () => U.downloadCsv(
+    [summaryHead, ...list.map(p => [p.name, p.shifts.size, p.checks, p.temps, p.photos, p.variance, p.last])],
+    `gomart_team_${n}d_${U.today()}.csv`);
+  const exportAll = () => U.downloadCsv(
+    [C, ...inRange.map(r => r.slice(0, 16))], `gomart_all_${n}d_${U.today()}.csv`);
+
+  render('ພາບລວມທີມງານ', (n === 1 ? 'ວັນນີ້' : n + ' ມື້ຜ່ານມາ') + ' · ດຶງຈາກແຜ່ນ', [
+    chips,
+    list.length
+      ? h('div', { class: 'stats', 'data-ui': 'content' }, [
+          stat('ຄົນທີ່ເຮັດວຽກ', String(list.length)),
+          stat('ກະທັງໝົດ', String(sum(p => p.shifts.size))),
+          stat('ເຊັກລິສຕ໌', String(sum('checks'))),
+          stat('ຮູບທັງໝົດ', String(sum('photos')))
+        ])
+      : null,
+    h('h3', { class: 'sec', text: 'ແຕ່ລະຄົນ' }),
+    list.length
+      ? card(list.map(p => h('div', { class: 'li', 'data-ui': 'content' }, [
+          h('div', { class: 'li-m' }, [
+            h('b', { text: p.name }),
+            h('small', { text: `${p.shifts.size} ກະ · ເຊັກລິສຕ໌ ${p.checks} · ກວດອຸນຫະພູມ ${p.temps} · ຮູບ ${p.photos}`
+              + (p.variance ? ' · ສ່ວນຕ່າງ ' + U.kip(p.variance) : '') }),
+            h('small', { text: 'ເຫັນຄັ້ງສຸດທ້າຍ ' + p.last })
+          ])
+        ])), 'tasks')
+      : card([h('div', { class: 'note', text: 'ໃນຊ່ວງນີ້ຍັງບໍ່ມີຂໍ້ມູນຈາກແຜ່ນ' })]),
+    h('h3', { class: 'sec', text: 'ດາວໂຫຼດ Report' }),
+    card([
+      h('div', { class: 'muted', text: 'ສະຫຼຸບແຕ່ລະຄົນ ຫຼື ຂໍ້ມູນທຸກແຖວ ເປີດດ້ວຍ Excel ໄດ້' }),
+      btn('ດາວໂຫຼດສະຫຼຸບແຕ່ລະຄົນ', exportSummary, 'primary'),
+      btn('ດາວໂຫຼດຂໍ້ມູນທັງໝົດ', exportAll, 'ghost')
+    ])
+  ]);
+};
 
 /* ---------- ເບີ້ຍຂະຫຍັນ ---------- */
 
