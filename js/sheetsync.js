@@ -33,7 +33,7 @@ const SHEETSYNC = (() => {
   /* ສົ່ງຄິວ ຖ້າຍັງບໍ່ໄດ້ຕັ້ງຄ່າ ເກັບໄວ້ກ່ອນ */
   function flush() { return serial(doFlush); }
   async function doFlush() {
-    const url = (await DB.setting('sheetUrl')) || DEFAULT_URL;
+    const url = DEFAULT_URL; /* ບໍ່ໃຊ້ URL ທີ່ບັນທຶກໄວ້ເກົ່າ — ໃຊ້ລິງປັດຈຸບັນສະເໝີ */
     const token = await DB.setting('sheetToken');
     const q = (await DB.setting('sheetQueue')) || [];
     if (!url || !token || q.length === 0) return { sent: 0, pending: q.length };
@@ -61,7 +61,7 @@ const SHEETSYNC = (() => {
 
   /* ສົ່ງການຕັ້ງຄ່າປັດຈຸບັນໄປແຜ່ນ (ແຜ່ນສະແດງຜົນ ແອັບເປັນຜູ້ແກ້) */
   async function pushSettings(rows) {
-    const url = (await DB.setting('sheetUrl')) || DEFAULT_URL;
+    const url = DEFAULT_URL;
     const token = await DB.setting('sheetToken');
     if (!url || !token) return { ok: false, error: 'ຍັງບໍ່ໄດ້ຕັ້ງລະຫັດ' };
     try {
@@ -74,7 +74,7 @@ const SHEETSYNC = (() => {
   /* ດຶງທຸກແຖວຈາກແຜ່ນ (ທຸກເຄື່ອງ) ສໍາລັບໜ້າພາບລວມທີມງານຂອງຜູ້ຈັດການ
    * ຄືນ { ok:true, rows:[...] } ຫຼື { ok:false, error } — ແຜ່ນເກົ່າທີ່ຍັງບໍ່ມີ action read ຈະຕອບ error */
   async function readAll() {
-    const url = (await DB.setting('sheetUrl')) || DEFAULT_URL;
+    const url = DEFAULT_URL;
     const token = await DB.setting('sheetToken');
     if (!url || !token) return { ok: false, error: 'ຍັງບໍ່ໄດ້ຕັ້ງລະຫັດ Sheet ໃນເຄື່ອງນີ້' };
     try {
